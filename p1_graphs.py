@@ -214,7 +214,8 @@ def plot_map(hex_data, mapa, ny_df, hex_buroughs, w=400, h=400):
     Returns:
     - alt.Chart: Altair chart object representing the map.
     """
-    # mapa = mapa.reset_index()
+    selection = alt.selection_multi(on="click", empty="all", fields=["BoroName"])
+    mapa = mapa.reset_index()
     hexagons = (
         alt.Chart(mapa)
         .mark_geoshape()
@@ -224,6 +225,7 @@ def plot_map(hex_data, mapa, ny_df, hex_buroughs, w=400, h=400):
                 title="Number of accidents",
                 scale=alt.Scale(scheme="greenblue"),
             ),
+            opacity=alt.condition(selection, alt.value(1), alt.value(0.5)),
             tooltip=["h3_polyfill:N", "counts:Q"],
         )
         .transform_lookup(
@@ -232,6 +234,7 @@ def plot_map(hex_data, mapa, ny_df, hex_buroughs, w=400, h=400):
         )
         .project(type="identity", reflectY=True)
         .properties(width=w, height=300)
+        .add_selection(selection)
     )
 
     labels = (
@@ -239,11 +242,18 @@ def plot_map(hex_data, mapa, ny_df, hex_buroughs, w=400, h=400):
         .mark_text(fontWeight="bold")
         .encode(longitude="x:Q", latitude="y:Q", text="BoroName:N")
     )
+
     borders = (
         alt.Chart(hex_buroughs)
         .mark_geoshape(stroke="darkgray", strokeWidth=1.25, opacity=1, fillOpacity=0)
         .project(type="identity", reflectY=True)
+        .encode(
+            # opacity=alt.condition(selection, alt.value(1), alt.value(0.5)),
+            # color=alt.condition(selection, alt.value(colors["col2"]), alt.value(colors["col1"])),
+            tooltip=["BoroName:N"],
+        )
         .properties(width=w, height=300)
+        .add_selection(selection)
     )
     burough_chart = (
         alt.Chart(hex_data)
@@ -251,11 +261,17 @@ def plot_map(hex_data, mapa, ny_df, hex_buroughs, w=400, h=400):
         .encode(
             x=alt.X("count()").title("Number of accidents"),
             y=alt.Y("BoroName:N", sort="-x", title=None),
+            color=alt.condition(
+                selection, alt.value(colors["col2"]), alt.value(colors["col1"])
+            ),
+            tooltip=["BoroName:N"],
         )
         .properties(width=w, height=h)
+        .add_selection(selection)
     )
-    map_chart = alt.layer(hexagons, borders, labels)
-    return map_chart, burough_chart
+    return alt.layer(hexagons,borders), burough_chart
+    # map_chart = alt.layer(hexagons, borders, labels)
+    # return map_chart, burough_chart
     # return hexagons + labels + borders, burough_chart
 
 

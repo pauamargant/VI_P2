@@ -1,0 +1,1 @@
+- https://github.com/altair-viz/altair/issues/1357 (aggregar les dades i lookup de geometry)
