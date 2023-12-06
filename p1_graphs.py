@@ -37,51 +37,6 @@ seq = [
 ]
 
 
-def get_accident_data(fname, sample=False):
-    """
-    Reads accident data from a CSV file and performs data preprocessing.
-
-    Parameters:
-    fname (str): The path to the CSV file.
-    sample (bool, optional): Whether to sample the data. Defaults to False.
-
-    Returns:
-    pandas.DataFrame: The preprocessed accident data.
-    """
-    df = pd.read_csv(fname)
-
-    df = df[
-        [
-            "CRASH DATE",
-            "CRASH TIME",
-            "BOROUGH",
-            "LATITUDE",
-            "LONGITUDE",
-            "VEHICLE TYPE CODE 1",
-        ]
-    ]
-
-    # Parse the date column as a date
-    df["date"] = pd.to_datetime(df["CRASH DATE"], format="%Y-%m-%d")
-    # filter year 2018 only
-    df = df[df["date"].dt.year == 2018]
-    # filter june, july, august
-    df = df[df["date"].dt.month.isin([6, 7, 8])]
-    if sample:
-        df = df.sample(1000)
-    # Create a column for weekday/weekend
-    df["weekday"] = df["date"].dt.dayofweek
-    df["weekday"] = df["weekday"].replace(
-        [0, 1, 2, 3, 4, 5, 6],
-        ["weekday", "weekday", "weekday", "weekday", "weekday", "weekend", "weekend"],
-    )
-
-    # Create a column indicating before or after COVID
-    df["covid"] = df["date"].dt.year
-    df["covid"] = df["covid"].replace([2018, 2020], ["before", "after"])
-    df["VEHICLE TYPE CODE 1"] = df["VEHICLE TYPE CODE 1"].str.title()
-
-    return df
 
 
 def get_chart_1(df, w=300, h=500):
@@ -163,7 +118,65 @@ def get_buroughs(hex_map):
     ny_df["x"] = hex_buroughs.centroid.x
     ny_df["y"] = hex_buroughs.centroid.y
     ny_df["BoroName"] = hex_buroughs.index
-    return ny_df, hex_buroughs
+    return ny_df, hex_buroughs.reset_index()
+def get_accident_data(fname, sample=False):
+    """
+    Reads accident data from a CSV file and performs data preprocessing.
+
+    Parameters:
+    fname (str): The path to the CSV file.
+    sample (bool, optional): Whether to sample the data. Defaults to False.
+
+    Returns:
+    pandas.DataFrame: The preprocessed accident data.
+    """
+    df = pd.read_csv(fname)
+
+    df = df[
+        [
+            "CRASH DATE",
+            "CRASH TIME",
+            "BOROUGH",
+            "LATITUDE",
+            "LONGITUDE",
+            "VEHICLE TYPE CODE 1",
+        ]
+    ]
+
+    # Parse the date column as a date
+    df["date"] = pd.to_datetime(df["CRASH DATE"], format="%Y-%m-%d")
+    # filter year 2018 only
+    df = df[df["date"].dt.year == 2018]
+    # filter june, july, august
+    df = df[df["date"].dt.month.isin([6, 7, 8])]
+    if sample:
+        df = df.sample(1000)
+    # Create a column for weekday/weekend
+    df["weekday"] = df["date"].dt.dayofweek
+    df["weekday"] = df["weekday"].replace(
+        [0, 1, 2, 3, 4, 5, 6],
+        ["weekday", "weekday", "weekday", "weekday", "weekday", "weekend", "weekend"],
+    )
+
+    # Create a column indicating before or after COVID
+    df["covid"] = df["date"].dt.year
+    df["covid"] = df["covid"].replace([2018, 2020], ["before", "after"])
+    df["VEHICLE TYPE CODE 1"] = df["VEHICLE TYPE CODE 1"].str.title()
+
+
+    _,burough_map = get_buroughs(get_map())
+    df = df.dropna(subset=["LATITUDE", "LONGITUDE"])
+    gdf = gpd.GeoDataFrame(
+        df, geometry=gpd.points_from_xy(df.LONGITUDE, df.LATITUDE)
+    )
+    gdf = gdf.set_crs(epsg=4326, inplace=True).to_crs("ESRI:102003")
+
+    gdf = gpd.sjoin(gdf, burough_map, how="right", op="intersects")
+     # convert to dataframe
+    gdf = pd.DataFrame(gdf)
+    # drop geometry 
+    gdf = gdf.drop(columns=["geometry"])
+    return gdf
 
 
 def calculate_spatial_data(df, hex_map):
@@ -201,7 +214,7 @@ def calculate_spatial_data(df, hex_map):
     return hex[["h3_polyfill", "counts", "BoroName"]]
 
 
-def plot_map(hex_data, mapa, ny_df, hex_buroughs, w=400, h=400):
+def plot_map(hex_data, mapa, ny_df, hex_buroughs, selection,w=400, h=400, ratio = 0.8):
     """
     Plots a map with hexagons representing the number of accidents,
     labels indicating the borough names, and borders for the boroughs.
@@ -214,7 +227,6 @@ def plot_map(hex_data, mapa, ny_df, hex_buroughs, w=400, h=400):
     Returns:
     - alt.Chart: Altair chart object representing the map.
     """
-    selection = alt.selection_multi(on="click", empty="all", fields=["BoroName"])
     mapa = mapa.reset_index()
     hexagons = (
         alt.Chart(mapa)
@@ -225,7 +237,7 @@ def plot_map(hex_data, mapa, ny_df, hex_buroughs, w=400, h=400):
                 title="Number of accidents",
                 scale=alt.Scale(scheme="greenblue"),
             ),
-            opacity=alt.condition(selection, alt.value(1), alt.value(0.5)),
+            opacity=alt.condition(selection, alt.value(1), alt.value(0.3)),
             tooltip=["h3_polyfill:N", "counts:Q"],
         )
         .transform_lookup(
@@ -233,8 +245,8 @@ def plot_map(hex_data, mapa, ny_df, hex_buroughs, w=400, h=400):
             from_=alt.LookupData(hex_data, "h3_polyfill", ["counts"]),
         )
         .project(type="identity", reflectY=True)
-        .properties(width=w, height=300)
-        .add_selection(selection)
+        .properties(width=w*ratio, height=300)
+        .add_params(selection)
     )
 
     labels = (
@@ -252,8 +264,8 @@ def plot_map(hex_data, mapa, ny_df, hex_buroughs, w=400, h=400):
             # color=alt.condition(selection, alt.value(colors["col2"]), alt.value(colors["col1"])),
             tooltip=["BoroName:N"],
         )
-        .properties(width=w, height=300)
-        .add_selection(selection)
+        .properties(width=w*ratio, height=300)
+        .add_params(selection)
     )
     burough_chart = (
         alt.Chart(hex_data)
@@ -266,8 +278,8 @@ def plot_map(hex_data, mapa, ny_df, hex_buroughs, w=400, h=400):
             ),
             tooltip=["BoroName:N"],
         )
-        .properties(width=w, height=h)
-        .add_selection(selection)
+        .properties(width=w*(1-ratio), height=h*1/2)
+        .add_params(selection)
     )
     return alt.layer(hexagons,borders), burough_chart
     # map_chart = alt.layer(hexagons, borders, labels)
@@ -399,10 +411,7 @@ def create_chart2(df, width=500, height=300):
 
 def get_weather_data(
     df,
-    fnames=[
-        "new york city 2018-06-01 to 2018-08-31.csv",
-        "new york city 2020-06-01 to 2020-08-31",
-    ],
+    fname = "weather.csv",
 ):
     """
     Retrieves weather data for a given DataFrame of accidents.
@@ -414,9 +423,7 @@ def get_weather_data(
     Returns:
         pandas.DataFrame: DataFrame containing merged accident and weather data.
     """
-    df_weather_1 = pd.read_csv("new york city 2018-06-01 to 2018-08-31.csv")
-    df_weather_2 = pd.read_csv("new york city 2020-06-01 to 2020-08-31.csv")
-    df_weather = pd.concat([df_weather_1, df_weather_2], axis=0)
+    df_weather = pd.read_csv(fname)
 
     weather_cond = df_weather[["datetime", "conditions"]].copy()
     weather_cond["datetime"] = pd.to_datetime(
