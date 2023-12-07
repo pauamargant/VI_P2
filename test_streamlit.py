@@ -38,7 +38,6 @@ base = (
 points = (
     alt.Chart(accident_data)
     .mark_circle()
-    .transform_filter(selection_cond)
     .encode(
         longitude="LONGITUDE:Q",
         latitude="LATITUDE:Q",
