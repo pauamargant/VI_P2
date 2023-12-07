@@ -37,8 +37,6 @@ seq = [
 ]
 
 
-
-
 def get_chart_1(df, w=300, h=500):
     """
     Generate a boxplot chart based on the provided dataframe.
@@ -97,7 +95,6 @@ def get_map():
     ny = gpd.read_file(path).to_crs("EPSG:4326")
     resolution = 8
     hex_map = ny.h3.polyfill_resample(resolution)
-    hex_map = hex_map.to_crs("ESRI:102003")
     return hex_map
 
 
@@ -119,6 +116,8 @@ def get_buroughs(hex_map):
     ny_df["y"] = hex_buroughs.centroid.y
     ny_df["BoroName"] = hex_buroughs.index
     return ny_df, hex_buroughs.reset_index()
+
+
 def get_accident_data(fname, sample=False):
     """
     Reads accident data from a CSV file and performs data preprocessing.
@@ -163,18 +162,15 @@ def get_accident_data(fname, sample=False):
     df["covid"] = df["covid"].replace([2018, 2020], ["before", "after"])
     df["VEHICLE TYPE CODE 1"] = df["VEHICLE TYPE CODE 1"].str.title()
 
-
-    _,burough_map = get_buroughs(get_map())
+    _, burough_map = get_buroughs(get_map())
     df = df.dropna(subset=["LATITUDE", "LONGITUDE"])
-    gdf = gpd.GeoDataFrame(
-        df, geometry=gpd.points_from_xy(df.LONGITUDE, df.LATITUDE)
-    )
-    gdf = gdf.set_crs(epsg=4326, inplace=True).to_crs("ESRI:102003")
+    gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df.LONGITUDE, df.LATITUDE))
+    gdf = gdf.set_crs(epsg=4326, inplace=False)
 
     gdf = gpd.sjoin(gdf, burough_map, how="right", op="intersects")
-     # convert to dataframe
+    # convert to dataframe
     gdf = pd.DataFrame(gdf)
-    # drop geometry 
+    # drop geometry
     gdf = gdf.drop(columns=["geometry"])
     return gdf
 
@@ -214,7 +210,17 @@ def calculate_spatial_data(df, hex_map):
     return hex[["h3_polyfill", "counts", "BoroName"]]
 
 
-def plot_map(hex_data, mapa, ny_df, hex_buroughs, selection,w=400, h=400, ratio = 0.8):
+def plot_map(
+    hex_data,
+    mapa,
+    ny_df,
+    hex_buroughs,
+    selection_buro,
+    selection_cond=None,
+    w=400,
+    h=400,
+    ratio=0.8,
+):
     """
     Plots a map with hexagons representing the number of accidents,
     labels indicating the borough names, and borders for the boroughs.
@@ -237,7 +243,7 @@ def plot_map(hex_data, mapa, ny_df, hex_buroughs, selection,w=400, h=400, ratio 
                 title="Number of accidents",
                 scale=alt.Scale(scheme="greenblue"),
             ),
-            opacity=alt.condition(selection, alt.value(1), alt.value(0.3)),
+            opacity=alt.condition(selection_buro, alt.value(1), alt.value(0.3)),
             tooltip=["h3_polyfill:N", "counts:Q"],
         )
         .transform_lookup(
@@ -245,8 +251,8 @@ def plot_map(hex_data, mapa, ny_df, hex_buroughs, selection,w=400, h=400, ratio 
             from_=alt.LookupData(hex_data, "h3_polyfill", ["counts"]),
         )
         .project(type="identity", reflectY=True)
-        .properties(width=w*ratio, height=300)
-        .add_params(selection)
+        .properties(width=w * ratio, height=300)
+        .add_params(selection_buro)
     )
 
     labels = (
@@ -264,37 +270,35 @@ def plot_map(hex_data, mapa, ny_df, hex_buroughs, selection,w=400, h=400, ratio 
             # color=alt.condition(selection, alt.value(colors["col2"]), alt.value(colors["col1"])),
             tooltip=["BoroName:N"],
         )
-        .properties(width=w*ratio, height=300)
-        .add_params(selection)
+        .properties(width=w * ratio, height=300)
+        .add_params(selection_buro)
     )
     burough_chart = (
         alt.Chart(hex_data)
         .mark_bar(orient="horizontal", height=20, color=colors["col1"])
+        .transform_filter(selection_cond)
         .encode(
             x=alt.X("count()").title("Number of accidents"),
             y=alt.Y("BoroName:N", sort="-x", title=None),
             color=alt.condition(
-                selection, alt.value(colors["col2"]), alt.value(colors["col1"])
+                selection_buro, alt.value(colors["col2"]), alt.value(colors["col1"])
             ),
             tooltip=["BoroName:N"],
         )
-        .properties(width=w*(1-ratio), height=h*1/2)
-        .add_params(selection)
+        .properties(width=w * (1 - ratio), height=h * 1 / 2)
+        .add_params(selection_buro)
     )
-    return alt.layer(hexagons,borders), burough_chart
+    return alt.layer(hexagons, borders), burough_chart
     # map_chart = alt.layer(hexagons, borders, labels)
     # return map_chart, burough_chart
     # return hexagons + labels + borders, burough_chart
 
 
-def borough_chart(df, w=500, h=300):
-    mapa = get_map()
-    ny_df, bur = get_buroughs(mapa)
-    hex_data = calculate_spatial_data(df, mapa)
-
+def get_burough_chart(df, selection=None, w=500, h=300):
     bar_chart = (
-        alt.Chart(hex_data)
+        alt.Chart(df)
         .mark_bar(orient="horizontal", height=20, color=colors["col1"])
+        .transform_filter(selection)
         .encode(
             x=alt.X("count()").title("Number of accidents"),
             y=alt.Y("BoroName:N", sort="-x", title=None),
@@ -411,7 +415,7 @@ def create_chart2(df, width=500, height=300):
 
 def get_weather_data(
     df,
-    fname = "weather.csv",
+    fname="weather.csv",
 ):
     """
     Retrieves weather data for a given DataFrame of accidents.
