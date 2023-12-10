@@ -175,123 +175,60 @@ def get_accident_data(fname, sample=False):
     return gdf
 
 
-def calculate_spatial_data(df, hex_map):
-    """
-    Calculate spatial data based on a dataframe and a hex map.
-
-    Args:
-        df (pandas.DataFrame): The input dataframe containing latitude and longitude information.
-        hex_map (geopandas.GeoDataFrame): The hex map used for spatial analysis.
-
-    Returns:
-        geopandas.GeoDataFrame: The hex map with additional spatial data.
-
-    """
-    df_coord = df.dropna(subset=["LATITUDE", "LONGITUDE"])
-    gdf = gpd.GeoDataFrame(
-        df_coord, geometry=gpd.points_from_xy(df_coord.LONGITUDE, df_coord.LATITUDE)
-    )[["geometry"]]
-    gdf = gdf.set_crs(epsg=4326, inplace=True).to_crs("ESRI:102003")
-
-    gdf = gpd.sjoin(gdf, hex_map, how="right", op="intersects")
-    print(gdf.columns)
-    gdf_count = (
-        gdf.groupby(["geometry", "h3_polyfill"]).size().reset_index(name="counts")
-    )
-    gdf_count["counts"] = gdf_count.apply(lambda row: row["counts"], axis=1)
-    df_geo = pd.DataFrame(gdf_count[["h3_polyfill", "counts"]])
-
-    hex = hex_map.merge(
-        df_geo, left_on="h3_polyfill", right_on="h3_polyfill", how="left"
-    )
-
-    # to 0 counts we sum 1
-    hex["counts"] = hex["counts"].apply(lambda x: 1 if x == 0 else x)
-    return hex[["h3_polyfill", "counts", "BoroName"]]
-
 
 def plot_map(
-    hex_data,
-    mapa,
-    ny_df,
-    hex_buroughs,
+    accident_data,
+    selection_cond,
     selection_buro,
-    selection_cond=None,
+    selection_month,
+    selection_weekday,
     w=400,
     h=400,
     ratio=0.8,
 ):
-    """
-    Plots a map with hexagons representing the number of accidents,
-    labels indicating the borough names, and borders for the boroughs.
+    ny = "https://raw.githubusercontent.com/pauamargant/VI_P1/main/resources/new-york-city-boroughs.geojson"
+    data_geojson_remote = alt.Data(
+        url=ny, format=alt.DataFormat(property="features", type="json")
+    )
 
-    Parameters:
-    - hex (alt.Chart): Altair chart object representing the hexagons.
-    - ny_df (alt.Chart): Altair chart object representing the New York data.
-    - hex_buroughs (alt.Chart): Altair chart object representing the hexagon boroughs.
-
-    Returns:
-    - alt.Chart: Altair chart object representing the map.
-    """
-    mapa = mapa.reset_index()
-    hexagons = (
-        alt.Chart(mapa)
+    base = (
+        alt.Chart(data_geojson_remote)
         .mark_geoshape()
+        .properties(
+            width=500,
+            height=300,
+        )
+        .project(type="albersUsa")
+        .add_params(selection_buro)
+        .encode(opacity=alt.condition(selection_buro, alt.value(0.8), alt.value(0.2)))
+        .properties(width=w * ratio, height=h)
+    )
+    points = (
+        alt.Chart(accident_data)
+        .transform_filter(selection_month & selection_weekday)
+        .mark_circle()
         .encode(
-            color=alt.Color(
-                "counts:Q",
-                title="Number of accidents",
-                scale=alt.Scale(scheme="greenblue"),
-            ),
-            opacity=alt.condition(selection_buro, alt.value(1), alt.value(0.3)),
-            tooltip=["h3_polyfill:N", "counts:Q"],
+            longitude="LONGITUDE:Q",
+            latitude="LATITUDE:Q",
+            size=alt.value(2),
+            color=alt.value("red"),
+            opacity=alt.condition(selection_buro, alt.value(1), alt.value(0)),
         )
-        .transform_lookup(
-            lookup="h3_polyfill",
-            from_=alt.LookupData(hex_data, "h3_polyfill", ["counts"]),
-        )
-        .project(type="identity", reflectY=True)
-        .properties(width=w * ratio, height=300)
         .add_params(selection_buro)
     )
 
-    labels = (
-        alt.Chart(ny_df)
-        .mark_text(fontWeight="bold")
-        .encode(longitude="x:Q", latitude="y:Q", text="BoroName:N")
-    )
-
-    borders = (
-        alt.Chart(hex_buroughs)
-        .mark_geoshape(stroke="darkgray", strokeWidth=1.25, opacity=1, fillOpacity=0)
-        .project(type="identity", reflectY=True)
+    bar_chart = (
+        alt.Chart(accident_data)
+        .mark_bar()
+        .transform_filter(selection_cond & selection_month & selection_weekday)
         .encode(
-            # opacity=alt.condition(selection, alt.value(1), alt.value(0.5)),
-            # color=alt.condition(selection, alt.value(colors["col2"]), alt.value(colors["col1"])),
-            tooltip=["BoroName:N"],
+            x=alt.X("count()"),
+            y=alt.Y("properties\\.name:N"),
+            opacity=alt.condition(selection_buro, alt.value(1), alt.value(0.4)),
         )
-        .properties(width=w * ratio, height=300)
-        .add_params(selection_buro)
+        .properties(width=w * (1 - ratio), height=h)
     )
-    burough_chart = (
-        alt.Chart(hex_data)
-        .mark_bar(orient="horizontal", height=20, color=colors["col1"])
-        .transform_filter(selection_cond)
-        .encode(
-            x=alt.X("count()").title("Number of accidents"),
-            y=alt.Y("BoroName:N", sort="-x", title=None),
-            color=alt.condition(
-                selection_buro, alt.value(colors["col2"]), alt.value(colors["col1"])
-            ),
-            tooltip=["BoroName:N"],
-        )
-        .properties(width=w * (1 - ratio), height=h * 1 / 2)
-        .add_params(selection_buro)
-    )
-    return alt.layer(hexagons, borders), burough_chart
-    # map_chart = alt.layer(hexagons, borders, labels)
-    # return map_chart, burough_chart
-    # return hexagons + labels + borders, burough_chart
+    return (base + points) | bar_chart
 
 
 def get_burough_chart(df, selection=None, w=500, h=300):
@@ -442,75 +379,22 @@ def get_weather_data(
     return data
 
 
-def weather_chart(data, w=500, h=300):
+def weather_chart(accident_data,selection_buro,selection_cond, selection_month, selection_weekday, w=500, h=300, ratio = 0.8):
     """
-    Generate a weather chart based on the given data.
-
-    Parameters:
-    - data: pandas DataFrame containing the necessary columns (date, conditions, CRASH TIME)
-    - w: width of the chart (default: 500)
-    - h: height of the chart (default: 300)
-
-    Returns:
-    - altair Chart object representing the weather chart
     """
 
-    colors = {"bg": "#eff0f3", "col1": "#d8b365", "col2": "#5ab4ac"}
-
-    per_day = (
-        data[["date", "conditions", "CRASH TIME"]]
-        .groupby(["date"])
-        .count()
-        .reset_index()
-    )
-    mean = per_day["CRASH TIME"].mean()
-
-    # mean per conditions
-    per_day_cond = (
-        data[["date", "conditions", "CRASH TIME"]]
-        .groupby(["date", "conditions"])
-        .count()
-        .reset_index()
-    )
-    mean_cond = (
-        per_day_cond[["conditions", "CRASH TIME"]]
-        .groupby(["conditions"])
-        .mean()
-        .reset_index()
-    )
-    mean_cond.columns = ["conditions", "mean_cond"]
-
-    mean_cond["diff"] = mean_cond["mean_cond"].apply(lambda x: x - mean)
+        
     bars = (
-        alt.Chart(mean_cond)
+        alt.Chart(accident_data)
+        .transform_filter(selection_buro  & selection_month & selection_weekday)
+        .transform_joinaggregate(day_count="count()", groupby=["date"])
+        .transform_joinaggregate(per_day_cond="mean(day_count)", groupby=["conditions"])
+        .transform_joinaggregate(per_day_mean="mean(day_count)", groupby=[])
+        .transform_calculate(diff="datum.per_day_cond - datum.per_day_mean")
         .mark_bar(height=3, orient="horizontal")
         .encode(
             y=alt.Y("conditions:N").sort("x"),
-            x="diff:Q",
-            color=alt.condition(
-                alt.datum.diff > 0,
-                alt.value(colors["col2"]),  # The positive color
-                alt.value(colors["col1"]),  # The negative color
-            ),
-        )
-        .properties(width=w, height=h)
-    )
-    min_diff = mean_cond["diff"].min() - 0.1
-    max_diff = mean_cond["diff"].max() + 0.1
-    domain = [min_diff, max_diff]
-    points = (
-        alt.Chart(mean_cond)
-        .mark_point(orient="horizontal", size=100, opacity=1, fillOpacity=1)
-        .encode(
-            y=alt.Y(
-                "conditions:N",
-                title="Conditions",
-                sort="x",
-                axis=alt.Axis(titleFontSize=14),
-            ),
-            x=alt.X("diff:Q", scale=alt.Scale(domain=domain)).title(
-                "Difference in percentage"
-            ),
+            x="min(diff):Q",
             color=alt.condition(
                 alt.datum.diff > 0,
                 alt.value(colors["col2"]),  # The positive color
@@ -521,10 +405,65 @@ def weather_chart(data, w=500, h=300):
                 alt.value(colors["col2"]),  # The positive color
                 alt.value(colors["col1"]),  # The negative color
             ),
+            opacity=alt.condition(selection_cond, alt.value(1), alt.value(0.2)),
         )
-        .properties(width=w, height=h)
+        .properties(width=w * ratio, height=h)
+        .add_params(selection_cond)
     )
-    return bars + points
+    dots = (
+        alt.Chart(accident_data)
+        .transform_filter(selection_buro  & selection_month & selection_weekday)
+        .transform_joinaggregate(day_count="count()", groupby=["date"])
+        .transform_joinaggregate(per_day_cond="mean(day_count)", groupby=["conditions"])
+        .transform_joinaggregate(per_day_mean="mean(day_count)", groupby=[])
+        .transform_calculate(diff="datum.per_day_cond - datum.per_day_mean")
+        .mark_point(height=3, orient="horizontal", size=100)
+        .encode(
+            y=alt.Y("conditions:N").sort("x"),
+            x="min(diff):Q",
+            color=alt.condition(
+                alt.datum.diff > 0,
+                alt.value(colors["col2"]),  # The positive color
+                alt.value(colors["col1"]),  # The negative color
+            ),
+            fill=alt.condition(
+                alt.datum.diff > 0,
+                alt.value(colors["col2"]),  # The positive color
+                alt.value(colors["col1"]),  # The negative color
+            ),
+            opacity=alt.condition(selection_cond, alt.value(1), alt.value(0.2)),
+        )
+        .properties(width=w * ratio, height=h)
+        .add_params(selection_cond)
+    )
+    bar_legend = (
+        alt.Chart(accident_data)
+        .mark_rect()
+        .transform_filter(selection_buro  & selection_month & selection_weekday)
+        .transform_joinaggregate(day_count="count()", groupby=["date"])
+        .transform_joinaggregate(per_day_cond="mean(day_count)", groupby=["conditions"])
+        .transform_joinaggregate(per_day_mean="mean(day_count)", groupby=[])
+        .transform_calculate(diff="datum.per_day_cond - datum.per_day_mean")
+        .encode(
+            y=alt.Y("conditions:N", sort=alt.EncodingSortField(field="diff")),
+            color="count()",
+            opacity=alt.condition(selection_cond, alt.value(1), alt.value(0.2)),
+        )
+        .properties(width=w * (1-ratio), height=h)
+        .add_params(selection_cond)
+    )
+    return (bars + dots) | bar_legend
+
+def calendar_chart(accident_data, selection_buro, selection_cond, selection_month, selection_weekday,w=200,h=300):
+    
+    return alt.Chart(accident_data).mark_rect().transform_filter(selection_cond & selection_buro).encode(
+        x = alt.X('weekday'),
+        y = alt.Y('week:O',scale=alt.Scale(domain=[5,4,3,2,1])),
+        row = alt.Column('month:O'),
+        color = alt.Color('count()'),
+        opacity=alt.condition(selection_month & selection_weekday, alt.value(1), alt.value(0.2))
+    ).add_params(selection_month, selection_weekday).properties(width=w, height=h)
+
 
 
 def q3_preprocessing(df):
