@@ -182,6 +182,8 @@ def plot_map(
     selection_buro,
     selection_month,
     selection_weekday,
+    selection_vehicle,
+    time_brush,
     w=400,
     h=400,
     ratio=0.8,
@@ -205,7 +207,7 @@ def plot_map(
     )
     points = (
         alt.Chart(accident_data)
-        .transform_filter(selection_month & selection_weekday)
+        .transform_filter(selection_cond & selection_month & selection_weekday & selection_vehicle & time_brush)
         .mark_circle()
         .encode(
             longitude="LONGITUDE:Q",
@@ -220,7 +222,7 @@ def plot_map(
     bar_chart = (
         alt.Chart(accident_data)
         .mark_bar()
-        .transform_filter(selection_cond & selection_month & selection_weekday)
+        .transform_filter(selection_cond & selection_month & selection_weekday & selection_vehicle & time_brush)
         .encode(
             x=alt.X("count()"),
             y=alt.Y("properties\\.name:N"),
@@ -246,48 +248,7 @@ def get_burough_chart(df, selection=None, w=500, h=300):
     return bar_chart
 
 
-def q2_preprocessing(df):
-    """
-    Preprocesses the given DataFrame by performing the following steps:
-    1. Counts the occurrences of each vehicle type code.
-    2. Selects the top 10 most frequent vehicle type codes.
-    3. Replaces all other vehicle type codes with "Others".
-    4. Groups the data by vehicle type code and sums the counts.
-    5. Sorts the data by count in descending order.
-    6. Separates the data into two parts: one with the top 10 vehicle type codes and one with "Others".
-    7. Concatenates the two parts.
-    8. Calculates the percentage of each vehicle type code count.
-
-    Parameters:
-    - df (pandas.DataFrame): The input DataFrame containing the vehicle type codes.
-
-    Returns:
-    - sorted_df (pandas.DataFrame): The preprocessed DataFrame with vehicle type codes and their counts and percentages.
-    """
-    count_df = df["VEHICLE TYPE CODE 1"].value_counts().reset_index()
-    count_df.columns = ["VEHICLE TYPE CODE 1", "count"]
-    top_10 = count_df.nlargest(9, "count")
-
-    count_df["VEHICLE TYPE CODE 1"] = np.where(
-        count_df["VEHICLE TYPE CODE 1"].isin(top_10["VEHICLE TYPE CODE 1"]),
-        count_df["VEHICLE TYPE CODE 1"],
-        "Others",
-    )
-    count_df = count_df.groupby("VEHICLE TYPE CODE 1").sum().reset_index()
-
-    sorted_df = count_df.sort_values(by="count", ascending=False)
-
-    df_part1 = sorted_df[sorted_df["VEHICLE TYPE CODE 1"] != "Others"]
-    df_part2 = sorted_df[sorted_df["VEHICLE TYPE CODE 1"] == "Others"]
-
-    sorted_df = pd.concat([df_part1, df_part2])
-
-    sorted_df["percentage"] = (sorted_df["count"] / sorted_df["count"].sum()) * 100
-
-    return sorted_df
-
-
-def create_chart2(df, width=500, height=300):
+def vehicle_chart(df, selection_buro, selection_cond, selection_month, selection_weekday, selection_vehicle, time_brush, width=500, height=300):
     """
     Creates a layered bar chart showing the percentage of accidents by vehicle type.
 
@@ -301,29 +262,30 @@ def create_chart2(df, width=500, height=300):
     """
     bar_chart = (
         alt.Chart(df)
+        .transform_filter(selection_buro & selection_month & selection_weekday & selection_cond & time_brush)
+        .transform_joinaggregate(day_count="count()", groupby=["date"])
+        .transform_joinaggregate(per_day_cond="mean(day_count)", groupby=["conditions"])
+        .transform_joinaggregate(per_day_mean="mean(day_count)", groupby=[])
+        .transform_calculate(diff="datum.per_day_cond - datum.per_day_mean")
         .mark_bar()
         .encode(
             y=alt.Y(
                 "VEHICLE TYPE CODE 1:N",
                 title=None,
-                sort=df["VEHICLE TYPE CODE 1"].tolist(),
+                sort=alt.EncodingSortField(field="count", order="descending"),
             ),
             x=alt.X(
-                "percentage:Q",
-                title="Percentage of accidents",
-                scale=alt.Scale(domain=(0, 50)),
+                "count()",
+                title="Number of accidents"
+                #scale=alt.Scale(domain=(0, 50)),
             ),
             color=alt.Color(
-                "VEHICLE TYPE CODE 1:N",
-                scale=alt.Scale(
-                    domain=df["VEHICLE TYPE CODE 1"].tolist() + ["Others"],
-                    range=[colors["col1"]] * (len(df["VEHICLE TYPE CODE 1"]) - 1)
-                    + ["gray"],
-                ),
-                legend=None,
+                "VEHICLE TYPE CODE 1:N", legend=None
             ),
-            tooltip=["VEHICLE TYPE CODE 1", "percentage"],
+            tooltip=["VEHICLE TYPE CODE 1", "count()"],
+            opacity=alt.condition(selection_vehicle, alt.value(1), alt.value(0.2)),
         )
+        .add_params(selection_vehicle).properties(width=width, height=height)
     )
 
     text_labels = bar_chart.mark_text(
@@ -333,21 +295,17 @@ def create_chart2(df, width=500, height=300):
         dx=3,  # Adjust the horizontal position of the labels
     ).encode(
         text=alt.Text(
-            "percentage:Q", format=".1f"
+            "count()"
         ),  # Format the percentage with one decimal place
-        color=alt.condition(
-            alt.datum["VEHICLE TYPE CODE 1"] == "Others",
-            alt.value("gray"),  # Set the text color to gray for the 'Others' category
-            alt.value("black"),  # Set the text color to black for other categories
-        ),
+        color=alt.value("black"),  # Set the text color to black for other categories,
     )
 
-    layered_chart = (
+    """layered_chart = (
         alt.layer(bar_chart, text_labels)
         .configure_axisX(grid=True)
         .properties(width=width, height=height)
-    )
-    return layered_chart
+    )"""
+    return bar_chart + text_labels
 
 
 def get_weather_data(
@@ -379,14 +337,14 @@ def get_weather_data(
     return data
 
 
-def weather_chart(accident_data,selection_buro,selection_cond, selection_month, selection_weekday, w=500, h=300, ratio = 0.8):
+def weather_chart(accident_data,selection_buro,selection_cond, selection_month, selection_weekday, selection_vehicle, time_brush, w=500, h=300, ratio = 0.8):
     """
     """
 
         
     bars = (
         alt.Chart(accident_data)
-        .transform_filter(selection_buro  & selection_month & selection_weekday)
+        .transform_filter(selection_buro & selection_month & selection_weekday & selection_vehicle & time_brush)
         .transform_joinaggregate(day_count="count()", groupby=["date"])
         .transform_joinaggregate(per_day_cond="mean(day_count)", groupby=["conditions"])
         .transform_joinaggregate(per_day_mean="mean(day_count)", groupby=[])
@@ -412,7 +370,7 @@ def weather_chart(accident_data,selection_buro,selection_cond, selection_month, 
     )
     dots = (
         alt.Chart(accident_data)
-        .transform_filter(selection_buro  & selection_month & selection_weekday)
+        .transform_filter(selection_buro  & selection_month & selection_weekday & selection_vehicle & time_brush)
         .transform_joinaggregate(day_count="count()", groupby=["date"])
         .transform_joinaggregate(per_day_cond="mean(day_count)", groupby=["conditions"])
         .transform_joinaggregate(per_day_mean="mean(day_count)", groupby=[])
@@ -439,7 +397,7 @@ def weather_chart(accident_data,selection_buro,selection_cond, selection_month, 
     bar_legend = (
         alt.Chart(accident_data)
         .mark_rect()
-        .transform_filter(selection_buro  & selection_month & selection_weekday)
+        .transform_filter(selection_buro  & selection_month & selection_weekday )
         .transform_joinaggregate(day_count="count()", groupby=["date"])
         .transform_joinaggregate(per_day_cond="mean(day_count)", groupby=["conditions"])
         .transform_joinaggregate(per_day_mean="mean(day_count)", groupby=[])
@@ -454,9 +412,10 @@ def weather_chart(accident_data,selection_buro,selection_cond, selection_month, 
     )
     return (bars + dots) | bar_legend
 
-def calendar_chart(accident_data, selection_buro, selection_cond, selection_month, selection_weekday,w=200,h=300):
+
+def calendar_chart(accident_data, selection_buro, selection_cond, selection_month, selection_weekday, selection_vehicle, time_brush, w=200,h=300):
     
-    return alt.Chart(accident_data).mark_rect().transform_filter(selection_cond & selection_buro).encode(
+    return alt.Chart(accident_data).mark_rect().transform_filter(selection_cond & selection_buro & selection_vehicle & time_brush).encode(
         x = alt.X('weekday'),
         y = alt.Y('week:O',scale=alt.Scale(domain=[5,4,3,2,1])),
         row = alt.Column('month:O'),
@@ -465,90 +424,25 @@ def calendar_chart(accident_data, selection_buro, selection_cond, selection_mont
     ).add_params(selection_month, selection_weekday).properties(width=w, height=h)
 
 
+def time_of_day_chart(df, selection_buro,selection_cond, selection_month, selection_weekday, selection_vehicle, time_brush, width=600, height=300):
 
-def q3_preprocessing(df):
-    """
-    Preprocesses the given DataFrame by converting the 'CRASH TIME' column to an integer representation.
-
-    Args:
-        df (pandas.DataFrame): The DataFrame to be preprocessed.
-
-    Returns:
-        pandas.DataFrame: The preprocessed DataFrame.
-    """
-    df = df[["CRASH TIME", "covid", "weekday"]]
-    df["CRASH TIME INT"] = (
-        pd.to_datetime(df["CRASH TIME"], format="%H:%M").dt.hour * 60
-        + pd.to_datetime(df["CRASH TIME"], format="%H:%M").dt.minute
-    )
-    df["CRASH TIME INT"] = (df["CRASH TIME INT"] // 30) * 30
-    df["CRASH TIME INT"] = df["CRASH TIME INT"].apply(
-        lambda x: f"{x // 60:02d}:{x % 60:02d}"
-    )
-    return df
-
-
-def create_chart3(df, color_palette, width=500, height=300):
-    """
-    Create a chart with morning and afternoon windows, and a before-after area plot.
-
-    Parameters:
-    - df: pandas DataFrame, the data to be plotted.
-    - color_palette: dict, a dictionary containing color values for the chart.
-    - width: int, optional, the width of the chart in pixels. Default is 500.
-    - height: int, optional, the height of the chart in pixels. Default is 300.
-
-    Returns:
-    - chart: altair Chart object, the created chart.
-    """
-    morning_rh = {}
-    morning_rh["x1"] = "08:00"
-    morning_rh["x2"] = "09:00"
-    morning_rh = pd.DataFrame([morning_rh])
-
-    afternoon_rh = {}
-    afternoon_rh["x1"] = "15:00"
-    afternoon_rh["x2"] = "19:00"
-    afternoon_rh = pd.DataFrame([afternoon_rh])
-
-    morning_rh["x1"] = pd.to_datetime(morning_rh["x1"])
-    morning_rh["x2"] = pd.to_datetime(morning_rh["x2"])
-
-    afternoon_rh["x1"] = pd.to_datetime(afternoon_rh["x1"])
-    afternoon_rh["x2"] = pd.to_datetime(afternoon_rh["x2"])
-
-    morning_window = (
-        alt.Chart(morning_rh)
-        .mark_rect(opacity=0.1)
-        .encode(x="hours(x1):T", x2="hours(x2):T", color=alt.value("gray"))
-    )
-
-    afternoon_window = (
-        alt.Chart(afternoon_rh)
-        .mark_rect(opacity=0.1)
-        .encode(x="hours(x1):T", x2="hours(x2):T", color=alt.value("gray"))
-    )
-
-    before_after = (
-        alt.Chart(width=width, height=height)
-        .mark_area(size=3, opacity=0.4, interpolate="basis")
-        .encode(
-            x=alt.X("hours(HOUR):T"),
-            y=alt.Y("count()").stack(None, title=None),
-            color=alt.Color(
-                "covid:N", scale=alt.Scale(range=[colors["col1"], colors["col2"]])
-            ),
+    base = (
+        alt.Chart(df, width=width, height=height)
+        .transform_filter(selection_buro & selection_month & selection_weekday & selection_cond & selection_vehicle)
+        .transform_joinaggregate(day_count="count()", groupby=["date"])
+        .transform_joinaggregate(per_day_cond="mean(day_count)", groupby=["conditions"])
+        .transform_joinaggregate(per_day_mean="mean(day_count)", groupby=[])
+        .transform_calculate(diff="datum.per_day_cond - datum.per_day_mean")
+        .mark_area(size=3, opacity = 0.3, interpolate="linear").encode(
+        x=alt.X("HOUR:T"),
+        y=alt.Y("count()").stack(None, title="Accidents per hour")
         )
     )
-    df["HOUR"] = pd.to_datetime(df["CRASH TIME"])
 
-    chart = (
-        alt.layer(before_after, morning_window, afternoon_window, data=df)
-        .facet(row=alt.Row("weekday", title=None, header=alt.Header(labelFontSize=16)))
-        .configure_axis(title=None)
-    )
-    return chart
+    background = base.add_selection(time_brush)
+    selected = base.transform_filter(time_brush).mark_area(opacity=0.8)
 
+    return background + selected
 
 def get_palette():
     """
