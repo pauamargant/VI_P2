@@ -151,16 +151,44 @@ def get_accident_data(fname, sample=False):
     if sample:
         df = df.sample(1000)
     # Create a column for weekday/weekend
-    df["weekday"] = df["date"].dt.dayofweek
+    """df["weekday"] = df["date"].dt.dayofweek
     df["weekday"] = df["weekday"].replace(
         [0, 1, 2, 3, 4, 5, 6],
         ["weekday", "weekday", "weekday", "weekday", "weekday", "weekend", "weekend"],
-    )
+    )"""
 
-    # Create a column indicating before or after COVID
-    df["covid"] = df["date"].dt.year
-    df["covid"] = df["covid"].replace([2018, 2020], ["before", "after"])
     df["VEHICLE TYPE CODE 1"] = df["VEHICLE TYPE CODE 1"].str.title()
+
+
+    #filter types of vehicles 
+    df['VEHICLE TYPE CODE 1'] = df['VEHICLE TYPE CODE 1'].replace(['Fire Truck'],'FIRE')
+    df['VEHICLE TYPE CODE 1'] = df['VEHICLE TYPE CODE 1'].replace(['Ambulance'],'AMBULANCE')
+    df['VEHICLE TYPE CODE 1'] = df['VEHICLE TYPE CODE 1'].replace(['Taxi'],'TAXI')
+    df = df[df['VEHICLE TYPE CODE 1'].isin(['FIRE','AMBULANCE','TAXI'])]
+
+    # create HOUR column from CRASH TIME
+    df["CRASH TIME"] = pd.to_datetime(df["CRASH TIME"])
+    df['HOUR'] = df['CRASH TIME'].dt.hour
+
+
+
+    df['weekday'] = df['date'].dt.weekday
+    # make weekend column
+    df['weekend'] = df['weekday'].apply(lambda x: 1 if x > 4 else 0)
+
+    # make column with week number
+    df['week'] = df['date'].dt.week
+    # month column
+    df['month'] = df['date'].dt.month
+
+
+
+    # for each month get the minimum week number
+    min_week = df.groupby(['month'])['week'].min().reset_index()
+    # merge with accident data
+    df = pd.merge(df,min_week,on='month',how='left')
+    df['week'] = df['week_x'] - df['week_y'] + 1
+
 
     _, burough_map = get_buroughs(get_map())
     df = df.dropna(subset=["LATITUDE", "LONGITUDE"])
@@ -170,8 +198,13 @@ def get_accident_data(fname, sample=False):
     gdf = gpd.sjoin(gdf, burough_map, how="right", op="intersects")
     # convert to dataframe
     gdf = pd.DataFrame(gdf)
+
+    # create properties.name column equal to BoroName
+    gdf['properties.name'] = gdf['BoroName']
+
     # drop geometry
     gdf = gdf.drop(columns=["geometry"])
+
     return gdf
 
 
