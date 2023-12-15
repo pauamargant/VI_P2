@@ -173,6 +173,7 @@ def get_accident_data(fname, sample=False):
 
 
     df['weekday'] = df['date'].dt.weekday
+    df['weekday_name'] = df['date'].dt.day
     # make weekend column
     df['weekend'] = df['weekday'].apply(lambda x: 1 if x > 4 else 0)
 
@@ -447,14 +448,31 @@ def weather_chart(accident_data,selection_buro,selection_cond, selection_month, 
 
 
 def calendar_chart(accident_data, selection_buro, selection_cond, selection_month, selection_weekday, selection_vehicle, time_brush, w=200,h=300):
-    
-    return alt.Chart(accident_data).mark_rect().transform_filter(selection_cond & selection_buro & selection_vehicle & time_brush).encode(
-        x = alt.X('weekday'),
-        y = alt.Y('week:O',scale=alt.Scale(domain=[5,4,3,2,1])),
-        row = alt.Column('month:O'),
+
+
+    base = alt.Chart(accident_data).mark_rect().transform_filter(selection_cond & selection_buro & selection_vehicle & time_brush).encode(
+        x = alt.X('weekday:O'),
+        y = alt.Y('week:O')
+    )       
+
+
+    calendars = base.mark_rect(stroke="grey").transform_filter(selection_cond & selection_buro & selection_vehicle & time_brush).encode(
+        #x = alt.X('weekday'),
+        #y = alt.Y('week:O'),
         color = alt.Color('count()'),
         opacity=alt.condition(selection_month & selection_weekday, alt.value(1), alt.value(0.2))
-    ).add_params(selection_month, selection_weekday).properties(width=w, height=h)
+    ).add_params(selection_month, selection_weekday).properties(width=w, height=int(h/3))
+
+    numbers = base.mark_text(baseline='middle').encode(
+        #x = alt.X('weekday'),
+        #y = alt.Y('week:O'),
+        text=alt.Text('date(CRASH DATE):O', format='%d'),
+        opacity=alt.condition(selection_month & selection_weekday, alt.value(1), alt.value(0.2))
+    )
+
+
+    return (calendars + numbers).facet(alt.Row('month:O', title=None))
+
 
 
 def time_of_day_chart(df, selection_buro,selection_cond, selection_month, selection_weekday, selection_vehicle, time_brush, width=600, height=300):
@@ -466,16 +484,30 @@ def time_of_day_chart(df, selection_buro,selection_cond, selection_month, select
         .transform_joinaggregate(per_day_cond="mean(day_count)", groupby=["conditions"])
         .transform_joinaggregate(per_day_mean="mean(day_count)", groupby=[])
         .transform_calculate(diff="datum.per_day_cond - datum.per_day_mean")
-        .mark_area(size=3, opacity = 0.3, interpolate="linear").encode(
-        x=alt.X("HOUR:T"),
+        .mark_area(size=3, opacity = 0.3, interpolate="cardinal").encode(
+        x=alt.X("hours(CRASH TIME):T", axis=alt.Axis(format='%H:%M')),
         y=alt.Y("count()").stack(None, title="Accidents per hour")
         )
     )
 
-    background = base.add_selection(time_brush)
-    selected = base.transform_filter(time_brush).mark_area(opacity=0.8)
+    dots = (
+        alt.Chart(df, width=width, height=height)
+        .transform_filter(selection_buro & selection_month & selection_weekday & selection_cond & selection_vehicle)
+        .transform_joinaggregate(day_count="count()", groupby=["date"])
+        .transform_joinaggregate(per_day_cond="mean(day_count)", groupby=["conditions"])
+        .transform_joinaggregate(per_day_mean="mean(day_count)", groupby=[])
+        .transform_calculate(diff="datum.per_day_cond - datum.per_day_mean")
+        .mark_point(size=50, filled=True).encode(
+        x=alt.X("hours(CRASH TIME):T", axis=alt.Axis(format='%H:%M')),
+        y=alt.Y("count()").stack(None, title="Accidents per hour"),
+        opacity=alt.condition(time_brush, alt.value(0.8), alt.value(0.1))
+        )
+    )
 
-    return background + selected
+    background = base.add_selection(time_brush)
+    selected = base.transform_filter(time_brush).mark_area(opacity=1, interpolate="cardinal")
+
+    return selected + dots + background
 
 def get_palette():
     """
