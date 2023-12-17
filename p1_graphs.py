@@ -184,10 +184,10 @@ def get_accident_data(fname, sample=False):
     df["month"] = df["date"].dt.month
 
     # # for each month get the minimum week number
-    # min_week = df.groupby(["month"])["week"].min().reset_index()
+    min_week = df.groupby(["month"])["week"].min().reset_index()
     # # merge with accident data
-    # df = pd.merge(df, min_week, on="month", how="left")
-    # df["week"] = df["week_x"] - df["week_y"] + 1
+    df = pd.merge(df, min_week, on="month", how="left")
+    df["week"] = df["week_x"] - df["week_y"] + 1
 
     _, burough_map = get_buroughs(get_map())
     df = df.dropna(subset=["LATITUDE", "LONGITUDE"])
@@ -211,6 +211,7 @@ def plot_map(
     accident_data,
     selection_cond,
     selection_buro,
+    selection_acc_map,
     selection_month,
     selection_weekday,
     selection_vehicle,
@@ -232,10 +233,14 @@ def plot_map(
             height=300,
         )
         .project(type="albersUsa")
-        .add_params(selection_buro)
         .encode(opacity=alt.condition(selection_buro, alt.value(0.8), alt.value(0.2)))
         .properties(width=w * ratio, height=h)
     )
+    # .transform_lookup(
+    #     lookup="name",
+    #     from_=alt.LookupData(accident_data, "BoroName"),
+    # )
+    # .add_params(selection_buro)
     points = (
         alt.Chart(accident_data)
         .transform_filter(
@@ -253,7 +258,8 @@ def plot_map(
             color=alt.value("red"),
             opacity=alt.condition(selection_buro, alt.value(1), alt.value(0)),
         )
-        .add_params(selection_buro)
+        .add_params(selection_acc_map)
+        # .add_params(selection_buro)
     )
 
     bar_chart = (
@@ -265,15 +271,16 @@ def plot_map(
             & selection_weekday
             & selection_vehicle
             & time_brush
+            & selection_acc_map
         )
         .encode(
             x=alt.X("count()"),
-            y=alt.Y("properties\\.name:N"),
+            y=alt.Y("BoroName:N"),
             opacity=alt.condition(selection_buro, alt.value(1), alt.value(0.4)),
         )
         .properties(width=w * (1 - ratio), height=h)
     )
-    return (base + points) | bar_chart
+    return (base + points) | bar_chart.add_params(selection_buro)
 
 
 def get_burough_chart(df, selection=None, w=500, h=300):
@@ -294,6 +301,7 @@ def get_burough_chart(df, selection=None, w=500, h=300):
 def vehicle_chart(
     df,
     selection_buro,
+    selection_acc_map,
     selection_cond,
     selection_month,
     selection_weekday,
@@ -321,6 +329,7 @@ def vehicle_chart(
             & selection_weekday
             & selection_cond
             & time_brush
+            & selection_acc_map
         )
         .transform_joinaggregate(day_count="count()", groupby=["date"])
         .transform_joinaggregate(per_day_cond="mean(day_count)", groupby=["conditions"])
@@ -396,6 +405,7 @@ def get_weather_data(
 def weather_chart(
     accident_data,
     selection_buro,
+    selection_acc_map,
     selection_cond,
     selection_month,
     selection_weekday,
@@ -415,6 +425,7 @@ def weather_chart(
             & selection_weekday
             & selection_vehicle
             & time_brush
+            & selection_acc_map
         )
         .transform_joinaggregate(day_count="count()", groupby=["date"])
         .transform_joinaggregate(per_day_cond="mean(day_count)", groupby=["conditions"])
@@ -493,21 +504,25 @@ def weather_chart(
 def calendar_chart(
     accident_data,
     selection_buro,
+    selection_acc_map,
     selection_cond,
     selection_month,
     selection_weekday,
-    selection_day,
-    selection_day_aux,
     selection_vehicle,
     time_brush,
     w=200,
     h=300,
 ):
+    ratio = 0.8
     base = (
         alt.Chart(accident_data)
         .mark_rect()
         .transform_filter(
-            selection_cond & selection_buro & selection_vehicle & time_brush
+            selection_cond
+            & selection_buro
+            & selection_vehicle
+            & time_brush
+            & selection_acc_map
         )
         .encode(x=alt.X("weekday:O"), y=alt.Y("week:O"))
     )
@@ -515,12 +530,19 @@ def calendar_chart(
     calendars = (
         base.mark_rect(stroke="grey")
         .transform_filter(
-            selection_cond & selection_buro & selection_vehicle & time_brush
+            selection_cond
+            & selection_buro
+            & selection_vehicle
+            & time_brush
+            & selection_acc_map
         )
         .encode(
             # x = alt.X('weekday'),
             # y = alt.Y('week:O'),
-            color=alt.Color("count()"),
+            color=alt.Color(
+                "count()",
+                scale=alt.Scale(scheme="lightmulti"),
+            ),
             opacity=alt.condition(
                 (selection_month & selection_weekday),
                 alt.value(1),
@@ -545,7 +567,11 @@ def calendar_chart(
         alt.Chart(accident_data)
         .mark_bar()
         .transform_filter(
-            selection_cond & selection_buro & selection_vehicle & time_brush
+            selection_cond
+            & selection_buro
+            & selection_vehicle
+            & time_brush
+            & selection_acc_map
         )
         .encode(
             x=alt.X(
@@ -561,32 +587,33 @@ def calendar_chart(
         alt.Chart(accident_data)
         .mark_bar()
         .transform_filter(
-            selection_cond & selection_buro & selection_vehicle & time_brush
+            selection_cond
+            & selection_buro
+            & selection_vehicle
+            & time_brush
+            & selection_acc_map
         )
         .encode(
             y=alt.Y("count()", axis=alt.Axis(title=None)),
             x=alt.X("weekday:O"),
             opacity=alt.condition(selection_weekday, alt.value(1), alt.value(0.2)),
         )
-        .properties(width=w, height=int(h / 3))
+        .properties(width=w, height=int(h * (ratio) / 3))
         .add_params(selection_weekday)
     )
 
     return weekday_bar & (
-        (calendars)
-        .facet(row="month:O")
-        .resolve_scale(y="independent")
-        .add_params(
-            selection_day, selection_day_aux, selection_weekday, selection_month
-        )
+        (calendars).facet(row="month:O").add_params(selection_weekday, selection_month)
         | month_bar
     )
     # .resolve(row="independent")
+    # .resolve_scale(y="independent", color="shared")
 
 
 def time_of_day_chart(
     df,
     selection_buro,
+    selection_acc_map,
     selection_cond,
     selection_month,
     selection_weekday,
@@ -603,16 +630,14 @@ def time_of_day_chart(
             & selection_weekday
             & selection_cond
             & selection_vehicle
+            & selection_acc_map
         )
-        .transform_joinaggregate(day_count="count()", groupby=["date"])
-        .transform_joinaggregate(per_day_cond="mean(day_count)", groupby=["conditions"])
-        .transform_joinaggregate(per_day_mean="mean(day_count)", groupby=[])
-        .transform_calculate(diff="datum.per_day_cond - datum.per_day_mean")
         .mark_area(size=3, opacity=0.3, interpolate="cardinal")
         .encode(
-            x=alt.X("hours(CRASH TIME):T", axis=alt.Axis(format="%H:%M")),
+            x=alt.X("HOUR:O"),  # axis=alt.Axis(format="%H:%M")),
             y=alt.Y("count()").stack(None, title="Accidents per hour"),
         )
+        .properties(width=width, height=height)
     )
 
     dots = (
@@ -623,20 +648,18 @@ def time_of_day_chart(
             & selection_weekday
             & selection_cond
             & selection_vehicle
+            & selection_acc_map
         )
-        .transform_joinaggregate(day_count="count()", groupby=["date"])
-        .transform_joinaggregate(per_day_cond="mean(day_count)", groupby=["conditions"])
-        .transform_joinaggregate(per_day_mean="mean(day_count)", groupby=[])
-        .transform_calculate(diff="datum.per_day_cond - datum.per_day_mean")
         .mark_point(size=50, filled=True)
         .encode(
-            x=alt.X("hours(CRASH TIME):T", axis=alt.Axis(format="%H:%M")),
+            x=alt.X("HOUR:O"),  # axis=alt.Axis(format="%H:%M")),
             y=alt.Y("count()").stack(None, title="Accidents per hour"),
             opacity=alt.condition(time_brush, alt.value(0.8), alt.value(0.1)),
         )
+        .properties(width=width, height=height)
     )
 
-    background = base.add_selection(time_brush)
+    background = base.add_params(time_brush)
     selected = base.transform_filter(time_brush).mark_area(
         opacity=1, interpolate="cardinal"
     )
