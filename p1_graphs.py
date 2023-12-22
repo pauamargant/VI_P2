@@ -14,7 +14,7 @@ import numpy as np
 # we disable max_rows in altair
 alt.data_transformers.disable_max_rows()
 
-colors = {"bg": "#eff0f3", "col1": "#4f8c9d", "col2": "#6ceac0"}
+colors = {"bg": "#eff0f3", "col1": "#4f8c9d", "col2": "#6ceac0","col3":"#c3dee6"}
 seq = [
     "#4f8c9d",
     "#5f9aa9",
@@ -73,17 +73,7 @@ def get_accident_data(fname, sample=False):
     """
     df = pd.read_csv(fname)
 
-    df = df[
-        [
-            "CRASH DATE",
-            "CRASH TIME",
-            "BOROUGH",
-            "LATITUDE",
-            "LONGITUDE",
-            "VEHICLE TYPE CODE 1",
-        ]
-    ]
-
+  
     # Parse the date column as a date
     df["date"] = pd.to_datetime(df["CRASH DATE"])  # , format="%Y-%m-%d")
     # filter year 2018 only
@@ -171,7 +161,7 @@ def get_map_chart(
 
     base = (
         alt.Chart(data_geojson_remote)
-        .mark_geoshape()
+        .mark_geoshape(fill=colors["col3"])
         .properties(
             width=500,
             height=300,
@@ -199,7 +189,7 @@ def get_map_chart(
             longitude="LONGITUDE:Q",
             latitude="LATITUDE:Q",
             size=alt.value(2),
-            color=alt.value("red"),
+            color=alt.Color('BoroName:N',legend=None),
             opacity=alt.condition(selection_buro, alt.value(1), alt.value(0)),
         )
         .add_params(selection_acc_map)
@@ -236,8 +226,8 @@ def get_vehicle_chart(
     selection_weekday,
     selection_vehicle,
     time_brush,
-    width=500,
-    height=300,
+    w=500,
+    h=300,
 ):
     """
     Creates a layered bar chart showing the percentage of accidents by vehicle type.
@@ -281,7 +271,7 @@ def get_vehicle_chart(
             opacity=alt.condition(selection_vehicle, alt.value(1), alt.value(0.2)),
         )
         .add_params(selection_vehicle)
-        .properties(width=width, height=height)
+        .properties(width=w, height=h)
     )
 
     text_labels = bar_chart.mark_text(
@@ -534,7 +524,7 @@ def get_calendar_chart(
     #     .add_params(selection_weekday)
     # )
 
-    return ((calendars.facet(row="month:O"))).add_params(
+    return ((calendars.facet(row="month:O",spacing=0))).add_params(
         selection_weekday, selection_month
     )
 
