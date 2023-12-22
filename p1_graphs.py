@@ -1,23 +1,14 @@
 import altair as alt
 import pandas as pd
-import os
 
 #!pip install geopandas
 import geopandas as gpd
 
 #!pip install geoplot
-import geoplot as gplt
 
 #!pip install geodatasets
-import geodatasets
 
-#!pip install h3pandas
-import h3pandas
-
-# import streamlit as st
-import base64
-import textwrap
-
+from geodatasets import get_path
 import numpy as np
 
 # we disable max_rows in altair
@@ -37,53 +28,6 @@ seq = [
 ]
 
 
-def get_chart_1(df, w=300, h=500):
-    """
-    Generate a boxplot chart based on the provided dataframe.
-
-    Parameters:
-    - df: pandas.DataFrame
-        The dataframe containing the data for the chart.
-    - w: int, optional
-        The width of the chart in pixels. Default is 300.
-    - h: int, optional
-        The height of the chart in pixels. Default is 500.
-
-    Returns:
-    - alt.Chart
-        The generated boxplot chart.
-    """
-    return (
-        alt.Chart(df)
-        .mark_boxplot(size=30)
-        .transform_aggregate(accidents="count()", groupby=["weekday", "date", "covid"])
-        .encode(
-            x=alt.X(
-                "covid:N",
-                title=None,
-                axis=alt.Axis(labelFontSize=16, labelAngle=0),
-                sort=["before", "after"],
-            ),
-            y=alt.Y("average(accidents):Q", axis=alt.Axis(labelFontSize=14)),
-            color=alt.Color(
-                "covid:N",
-                legend=None,
-                scale=alt.Scale(range=[colors["col1"], colors["col2"]]),
-            ),
-            column=alt.Column(
-                "weekday:N",
-                header=alt.Header(labelFontSize=16),
-                title=None,
-                sort=alt.SortField(
-                    field="weekday:N", order="ascending"
-                ),  # Order by weekday in descending order
-            ),
-        )
-        .properties(width=w, height=h)
-        .configure_axis(titleFontSize=16)
-    )
-
-
 def get_map():
     """
     Retrieves a hexagonal map of New York City.
@@ -91,14 +35,12 @@ def get_map():
     Returns:
         GeoDataFrame: A hexagonal map of New York City.
     """
-    path = geodatasets.get_path("nybb")
+    path = get_path("nybb")
     ny = gpd.read_file(path).to_crs("EPSG:4326")
-    resolution = 8
-    hex_map = ny.h3.polyfill_resample(resolution)
-    return hex_map
+    return ny
 
 
-def get_buroughs(hex_map):
+def get_buroughs():
     """
     Get the boroughs from a hex map.
 
@@ -106,16 +48,16 @@ def get_buroughs(hex_map):
     - hex_map: The hex map to extract boroughs from.
 
     Returns:
-    - ny_df: DataFrame containing centroid x, y, and borough name.
     - hex_buroughs: Dissolved hex map by borough name.
     """
-    hex_buroughs = hex_map.dissolve(by="BoroName")
+    path = get_path("nybb")
+    buroughs = gpd.read_file(path).to_crs("EPSG:4326")
 
     ny_df = pd.DataFrame()
-    ny_df["x"] = hex_buroughs.centroid.x
-    ny_df["y"] = hex_buroughs.centroid.y
-    ny_df["BoroName"] = hex_buroughs.index
-    return ny_df, hex_buroughs.reset_index()
+    ny_df["x"] = buroughs.centroid.x
+    ny_df["y"] = buroughs.centroid.y
+    ny_df["BoroName"] = buroughs.index
+    return buroughs.reset_index()
 
 
 def get_accident_data(fname, sample=False):
@@ -143,7 +85,7 @@ def get_accident_data(fname, sample=False):
     ]
 
     # Parse the date column as a date
-    df["date"] = pd.to_datetime(df["CRASH DATE"], format="%Y-%m-%d")
+    df["date"] = pd.to_datetime(df["CRASH DATE"])  # , format="%Y-%m-%d")
     # filter year 2018 only
     df = df[df["date"].dt.year == 2018]
     # filter june, july, august
@@ -179,7 +121,7 @@ def get_accident_data(fname, sample=False):
     df["weekend"] = df["weekday"].apply(lambda x: 1 if x > 4 else 0)
 
     # make column with week number
-    df["week"] = df["date"].dt.week
+    df["week"] = df["date"].dt.isocalendar().week
     # month column
     df["month"] = df["date"].dt.month
 
@@ -189,7 +131,7 @@ def get_accident_data(fname, sample=False):
     df = pd.merge(df, min_week, on="month", how="left")
     df["week"] = df["week_x"] - df["week_y"] + 1
 
-    _, burough_map = get_buroughs(get_map())
+    burough_map = get_buroughs()
     df = df.dropna(subset=["LATITUDE", "LONGITUDE"])
     gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df.LONGITUDE, df.LATITUDE))
     gdf = gdf.set_crs(epsg=4326, inplace=False)
@@ -200,6 +142,8 @@ def get_accident_data(fname, sample=False):
 
     # create properties.name column equal to BoroName
     gdf["properties.name"] = gdf["BoroName"]
+    # make column month_number- week_number
+    gdf["month-week"] = gdf["month"].astype(str) + "-" + gdf["week"].astype(str)
 
     # drop geometry
     gdf = gdf.drop(columns=["geometry"])
@@ -207,7 +151,7 @@ def get_accident_data(fname, sample=False):
     return gdf
 
 
-def plot_map(
+def get_map_chart(
     accident_data,
     selection_cond,
     selection_buro,
@@ -283,22 +227,7 @@ def plot_map(
     return (base + points) | bar_chart.add_params(selection_buro)
 
 
-def get_burough_chart(df, selection=None, w=500, h=300):
-    bar_chart = (
-        alt.Chart(df)
-        .mark_bar(orient="horizontal", height=20, color=colors["col1"])
-        .transform_filter(selection)
-        .encode(
-            x=alt.X("count()").title("Number of accidents"),
-            y=alt.Y("BoroName:N", sort="-x", title=None),
-        )
-        .properties(width=200, height=300)
-    )
-
-    return bar_chart
-
-
-def vehicle_chart(
+def get_vehicle_chart(
     df,
     selection_buro,
     selection_acc_map,
@@ -402,7 +331,7 @@ def get_weather_data(
     return data
 
 
-def weather_chart(
+def get_weather_chart(
     accident_data,
     selection_buro,
     selection_acc_map,
@@ -416,6 +345,8 @@ def weather_chart(
     ratio=0.8,
 ):
     """ """
+    # select only needed columns
+    # accident_data = accident_data[["date", "conditions",'conditions']]
 
     bars = (
         alt.Chart(accident_data)
@@ -501,7 +432,7 @@ def weather_chart(
     return (bars + dots) | bar_legend
 
 
-def calendar_chart(
+def get_calendar_chart(
     accident_data,
     selection_buro,
     selection_acc_map,
@@ -512,8 +443,10 @@ def calendar_chart(
     time_brush,
     w=200,
     h=300,
+    ratio=0.8,
 ):
-    ratio = 0.8
+    # select only needed columns
+    # accident_data = accident_data[["date", "weekday", "month", "week","CRASH DATE"]]
     base = (
         alt.Chart(accident_data)
         .mark_rect()
@@ -525,6 +458,7 @@ def calendar_chart(
             & selection_acc_map
         )
         .encode(x=alt.X("weekday:O"), y=alt.Y("week:O"))
+        .properties(width=int(w), height=int(h / 3))
     )
 
     calendars = (
@@ -550,7 +484,6 @@ def calendar_chart(
             ),
             # opacity = alt.condition(selection_day_aux,alt.value(1),alt.value(0.2))
         )
-        .properties(width=w, height=int(h / 3))
     )
 
     numbers = base.mark_text(baseline="middle").encode(
@@ -577,40 +510,36 @@ def calendar_chart(
             x=alt.X(
                 "count()", scale=alt.Scale(reverse=False), axis=alt.Axis(title=None)
             ),
-            row=alt.Row("month:O", title=None),
+            y=alt.Y("month:O", title=None),
             opacity=alt.condition(selection_month, alt.value(1), alt.value(0.2)),
         )
-        .properties(width=int(w / 3), height=int(h / 3))
-        .add_params(selection_month)
+        .properties(width=int(w / 3), height=h)
     )
-    weekday_bar = (
-        alt.Chart(accident_data)
-        .mark_bar()
-        .transform_filter(
-            selection_cond
-            & selection_buro
-            & selection_vehicle
-            & time_brush
-            & selection_acc_map
-        )
-        .encode(
-            y=alt.Y("count()", axis=alt.Axis(title=None)),
-            x=alt.X("weekday:O"),
-            opacity=alt.condition(selection_weekday, alt.value(1), alt.value(0.2)),
-        )
-        .properties(width=w, height=int(h * (ratio) / 3))
-        .add_params(selection_weekday)
+    # weekday_bar = (
+    #     alt.Chart(accident_data)
+    #     .mark_bar()
+    #     .transform_filter(
+    #         selection_cond
+    #         & selection_buro
+    #         & selection_vehicle
+    #         & time_brush
+    #         & selection_acc_map
+    #     )
+    #     .encode(
+    #         y=alt.Y("count()", axis=alt.Axis(title=None)),
+    #         x=alt.X("weekday:O"),
+    #         opacity=alt.condition(selection_weekday, alt.value(1), alt.value(0.2)),
+    #     )
+    #     .properties(width=w, height=int(h * (ratio) / 3))
+    #     .add_params(selection_weekday)
+    # )
+
+    return ((calendars.facet(row="month:O"))).add_params(
+        selection_weekday, selection_month
     )
 
-    return weekday_bar & (
-        (calendars).facet(row="month:O").add_params(selection_weekday, selection_month)
-        | month_bar
-    )
-    # .resolve(row="independent")
-    # .resolve_scale(y="independent", color="shared")
 
-
-def time_of_day_chart(
+def get_time_of_day_chart(
     df,
     selection_buro,
     selection_acc_map,
@@ -619,59 +548,73 @@ def time_of_day_chart(
     selection_weekday,
     selection_vehicle,
     time_brush,
-    width=600,
-    height=300,
+    w=600,
+    h=300,
 ):
+    # select only columns HOUR, weekday
+    # df = df[["HOUR", "weekday"]]
     base = (
-        alt.Chart(df, width=width, height=height)
+        alt.Chart(df)
+        .mark_rect()
+        .encode(x=alt.X("HOUR:O"), y=alt.Y("weekday:O"))
         .transform_filter(
-            selection_buro
-            & selection_month
-            & selection_weekday
-            & selection_cond
-            & selection_vehicle
-            & selection_acc_map
+            selection_cond & selection_buro & selection_vehicle & selection_acc_map
         )
-        .mark_area(size=3, opacity=0.3, interpolate="cardinal")
-        .encode(
-            x=alt.X("HOUR:O"),  # axis=alt.Axis(format="%H:%M")),
-            y=alt.Y("count()").stack(None, title="Accidents per hour"),
-        )
-        .properties(width=width, height=height)
     )
 
-    dots = (
-        alt.Chart(df, width=width, height=height)
+    times_of_day = (
+        base.mark_rect(stroke="grey")
+        .encode(
+            # x = alt.X('weekday'),
+            # y = alt.Y('week:O'),
+            color=alt.Color(
+                "count()",
+                scale=alt.Scale(scheme="lightmulti"),
+            ),
+            opacity=alt.condition(
+                time_brush & selection_weekday, alt.value(1), alt.value(0.2)
+            ),
+            # opacity=alt.condition(
+            #     (selection_month & selection_weekday),
+            #     alt.value(1),
+            #     alt.value(0.2),
+            # ),
+            # opacity = alt.condition(selection_day_aux,alt.value(1),alt.value(0.2))
+        )
+        .properties(width=w, height=int(h / 3))
+        .add_params(time_brush, selection_weekday)
+    )
+
+    hour_bar = (
+        alt.Chart(df)
+        .mark_bar()
         .transform_filter(
-            selection_buro
-            & selection_month
-            & selection_weekday
-            & selection_cond
-            & selection_vehicle
-            & selection_acc_map
+            selection_cond & selection_buro & selection_vehicle & selection_acc_map
         )
-        .mark_point(size=50, filled=True)
         .encode(
-            x=alt.X("HOUR:O"),  # axis=alt.Axis(format="%H:%M")),
-            y=alt.Y("count()").stack(None, title="Accidents per hour"),
-            opacity=alt.condition(time_brush, alt.value(0.8), alt.value(0.1)),
+            y=alt.Y(
+                "count()", scale=alt.Scale(reverse=False), axis=alt.Axis(title=None)
+            ),
+            x=alt.X("HOUR:O"),
+            opacity=alt.condition(time_brush, alt.value(1), alt.value(0.2)),
         )
-        .properties(width=width, height=height)
+        .properties(width=int(w), height=int(h / 3))
+        .add_params(time_brush)
+        # .add_params(selection_month)
     )
-
-    background = base.add_params(time_brush)
-    selected = base.transform_filter(time_brush).mark_area(
-        opacity=1, interpolate="cardinal"
+    weekday_bar = (
+        alt.Chart(df)
+        .mark_bar()
+        .transform_filter(
+            selection_cond & selection_buro & selection_vehicle & selection_acc_map
+        )
+        .encode(
+            x=alt.X("count()", axis=alt.Axis(title=None)),
+            y=alt.Y("weekday:O"),
+            opacity=alt.condition(selection_weekday, alt.value(1), alt.value(0.2)),
+        )
+        .properties(width=int(w / 3), height=int(h / 3))
+        .add_params(selection_weekday)
     )
-
-    return selected + dots + background
-
-
-def get_palette():
-    """
-    Returns the palette of colors used for graphs.
-
-    Returns:
-        list: A list of colors.
-    """
-    return colors
+    time_chart = hour_bar & (times_of_day | weekday_bar)
+    return time_chart
