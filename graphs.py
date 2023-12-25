@@ -120,6 +120,9 @@ def get_accident_data(fname, sample=False):
     df = pd.merge(df, min_week, on="month", how="left")
     df["week"] = df["week_x"] - df["week_y"] + 1
 
+    df["dayname"] = df["date"].dt.day_name()
+    df["monthname"] = df["date"].dt.month_name()
+
     burough_map = get_buroughs()
     df = df.dropna(subset=["LATITUDE", "LONGITUDE"])
     gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df.LONGITUDE, df.LATITUDE))
@@ -470,6 +473,16 @@ def get_calendar_chart(
     h=300,
     ratio=0.8,
 ):
+    order = [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday",
+    ]
+    month_order = ["June", "July", "August"]
     # select only needed columns
     # accident_data = accident_data[["date", "weekday", "month", "week","CRASH DATE"]]
     base = (
@@ -483,7 +496,11 @@ def get_calendar_chart(
             & selection_acc_map
             & selection_acc_factor
         )
-        .encode(x=alt.X("weekday:O"), y=alt.Y("week:O"))
+        .encode(
+            x=alt.X("dayname:O", sort=order),
+            y=alt.Y("week:O", title=None, axis=alt.Axis(labels=False)),
+            row=alt.Row("monthname:O", sort=month_order),
+        )
         .properties(width=int(w), height=int(h / 3))
     )
 
