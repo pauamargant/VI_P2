@@ -114,9 +114,6 @@ def get_accident_data(fname, sample=False):
     # month column
     df["month"] = df["date"].dt.month
 
-    df["dayname"] = df["date"].dt.day_name()
-    df["monthname"] = df["date"].dt.month_name()
-
     # # for each month get the minimum week number
     min_week = df.groupby(["month"])["week"].min().reset_index()
     # # merge with accident data
@@ -153,7 +150,7 @@ def get_map_chart(
     selection_month,
     selection_weekday,
     selection_vehicle,
-    selection_time,
+    time_brush,
     selection_acc_factor,
     w=400,
     h=400,
@@ -192,7 +189,7 @@ def get_map_chart(
             & selection_month
             & selection_weekday
             & selection_vehicle
-            & selection_time
+            & time_brush
             & selection_acc_factor
         )
         .mark_circle()
@@ -215,7 +212,7 @@ def get_map_chart(
             & selection_month
             & selection_weekday
             & selection_vehicle
-            & selection_time
+            & time_brush
             & selection_acc_map
             & selection_acc_factor
         )
@@ -243,7 +240,7 @@ def get_vehicle_chart(
     selection_month,
     selection_weekday,
     selection_vehicle,
-    selection_time,
+    time_brush,
     selection_acc_factor,
     w=500,
     h=300,
@@ -266,7 +263,7 @@ def get_vehicle_chart(
             & selection_month
             & selection_weekday
             & selection_cond
-            & selection_time
+            & time_brush
             & selection_acc_map
             & selection_acc_factor
         )
@@ -363,7 +360,7 @@ def get_weather_chart(
     selection_month,
     selection_weekday,
     selection_vehicle,
-    selection_time,
+    time_brush,
     selection_acc_factor,
     w=500,
     h=300,
@@ -380,7 +377,7 @@ def get_weather_chart(
             & selection_month
             & selection_weekday
             & selection_vehicle
-            & selection_time
+            & time_brush
             & selection_acc_map
             & selection_acc_factor
         )
@@ -414,7 +411,7 @@ def get_weather_chart(
             & selection_month
             & selection_weekday
             & selection_vehicle
-            & selection_time
+            & time_brush
             & selection_acc_factor
         )
         .transform_joinaggregate(day_count="count()", groupby=["date"])
@@ -467,7 +464,7 @@ def get_calendar_chart(
     selection_month,
     selection_weekday,
     selection_vehicle,
-    selection_time,
+    time_brush,
     selection_acc_factor,
     w=200,
     h=300,
@@ -475,17 +472,6 @@ def get_calendar_chart(
 ):
     # select only needed columns
     # accident_data = accident_data[["date", "weekday", "month", "week","CRASH DATE"]]
-    order = [
-        "Monday",
-        "Tuesday",
-        "Wednesday",
-        "Thursday",
-        "Friday",
-        "Saturday",
-        "Sunday",
-    ]
-    month_order = ["June", "July", "August"]
-
     base = (
         alt.Chart(accident_data)
         .mark_rect()
@@ -493,15 +479,11 @@ def get_calendar_chart(
             selection_cond
             & selection_buro
             & selection_vehicle
-            & selection_time
+            & time_brush
             & selection_acc_map
             & selection_acc_factor
         )
-        .encode(
-            x=alt.X("dayname:O", sort=order),
-            y=alt.Y("week:O", title=None, axis=alt.Axis(labels=False)),
-            row=alt.Row("monthname:O", sort=month_order),
-        )
+        .encode(x=alt.X("weekday:O"), y=alt.Y("week:O"))
         .properties(width=int(w), height=int(h / 3))
     )
 
@@ -511,7 +493,7 @@ def get_calendar_chart(
             selection_cond
             & selection_buro
             & selection_vehicle
-            & selection_time
+            & time_brush
             & selection_acc_map
             & selection_acc_factor
         )
@@ -550,7 +532,7 @@ def get_calendar_chart(
             selection_cond
             & selection_buro
             & selection_vehicle
-            & selection_time
+            & time_brush
             & selection_acc_map
         )
         .encode(
@@ -569,7 +551,7 @@ def get_calendar_chart(
     #         selection_cond
     #         & selection_buro
     #         & selection_vehicle
-    #         & selection_time
+    #         & time_brush
     #         & selection_acc_map
     #     )
     #     .encode(
@@ -594,7 +576,7 @@ def get_time_of_day_chart(
     selection_month,
     selection_weekday,
     selection_vehicle,
-    selection_time,
+    time_brush,
     selection_acc_factor,
     w=600,
     h=300,
@@ -608,7 +590,7 @@ def get_time_of_day_chart(
     base = (
         alt.Chart(df)
         .mark_rect()
-        .encode(x=alt.X("HOUR:O"), y=alt.Y("dayname:O", title=None))
+        .encode(x=alt.X("HOUR:O"), y=alt.Y("weekday:O"))
         .transform_filter(
             selection_cond
             & selection_buro
@@ -628,7 +610,7 @@ def get_time_of_day_chart(
                 scale=alt.Scale(scheme="tealblues"),
             ),
             opacity=alt.condition(
-                selection_time & selection_weekday, alt.value(1), alt.value(0.2)
+                time_brush & selection_weekday, alt.value(1), alt.value(0.2)
             ),
             tooltip=["count()"],
             # legend=alt.Legend(title="Number of accidents",layout = ''),
@@ -640,7 +622,7 @@ def get_time_of_day_chart(
             # opacity = alt.condition(selection_day_aux,alt.value(1),alt.value(0.2))
         )
         .properties(width=w1, height=h1)
-        .add_params(selection_time, selection_weekday)
+        .add_params(time_brush, selection_weekday)
         .interactive()
     )
 
@@ -657,11 +639,11 @@ def get_time_of_day_chart(
         .encode(
             y=alt.Y("count()", scale=alt.Scale(reverse=False)),
             x=alt.X("HOUR:O", axis=None),
-            opacity=alt.condition(selection_time, alt.value(1), alt.value(0.2)),
+            opacity=alt.condition(time_brush, alt.value(1), alt.value(0.2)),
             tooltip=["count()"],
         )
         .properties(width=int(w1), height=h2)
-        .add_params(selection_time)
+        .add_params(time_brush)
         .interactive()
         # .add_params(selection_month)
     )
@@ -699,7 +681,7 @@ def get_factor_chart(
     selection_month,
     selection_weekday,
     selection_vehicle,
-    selection_time,
+    time_brush,
     selection_acc_factor,
     w=600,
     h=300,
@@ -714,7 +696,7 @@ def get_factor_chart(
             & selection_month
             & selection_weekday
             & selection_vehicle
-            & selection_time
+            & time_brush
         )
         .encode(
             x=alt.X(
