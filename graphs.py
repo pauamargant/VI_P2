@@ -454,11 +454,6 @@ def get_weather_chart(
     bar_legend = (
         alt.Chart(accident_data)
         .mark_rect()
-        .transform_filter(selection_buro & selection_month & selection_weekday)
-        .transform_joinaggregate(day_count="count()", groupby=["date"])
-        .transform_joinaggregate(per_day_cond="mean(day_count)", groupby=["conditions"])
-        .transform_joinaggregate(per_day_mean="mean(day_count)", groupby=[])
-        .transform_calculate(diff="datum.per_day_cond - datum.per_day_mean")
         .encode(
             y=alt.Y("conditions:N", sort=alt.EncodingSortField(field="diff")),
             color="count()",
@@ -467,7 +462,8 @@ def get_weather_chart(
         .properties(width=w * (1 - ratio), height=h)
         .add_params(selection_cond)
     )
-    return (bars + dots) | bar_legend
+    return bar_legend
+    # return (bars + ts) | bar_legend
 
 
 def get_calendar_chart(
@@ -807,7 +803,7 @@ def make_visualization(accident_data):
     selection_cond = alt.selection_point(on="click", fields=["conditions"])
     selection_acc_map = alt.selection_interval()
     selection_buro = alt.selection_point(fields=["name"])
-    selection_vehicle = alt.selection_multi(on="click", fields=["VEHICLE TYPE CODE 1"])
+    selection_vehicle = alt.selection_point(on="click", fields=["VEHICLE TYPE CODE 1"])
     time_brush = alt.selection_point(fields=["HOUR"])
 
     selection_weekday = alt.selection_point(fields=["dayname"])
