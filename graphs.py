@@ -156,7 +156,8 @@ def get_map_chart(
     time_brush,
     selection_acc_factor,
     w=400,
-    h=400,
+    h1=400,
+    h2=200,
     ratio=0.8,
 ):
     ny = "https://raw.githubusercontent.com/pauamargant/VI_P1/main/resources/new-york-city-boroughs.geojson"
@@ -177,7 +178,7 @@ def get_map_chart(
             color=alt.Color("name:N"),
             tooltip=["name:N"],
         )
-        .properties(width=w * ratio, height=h)
+        .properties(width=w * ratio, height=h1)
         .interactive()
     )
     # .transform_lookup(
@@ -226,13 +227,16 @@ def get_map_chart(
             color=alt.Color("name:N", legend=None),
             tooltip=["name:N", "count()"],
         )
-        .properties(width=w * (1 - ratio), height=h)
+        .properties(width=w * (1 - ratio), height=h2)
     )
-    return (
-        ((base + points) | bar_chart)
-        .resolve_scale(color="shared")
-        .add_params(selection_buro)
+    return (base + points).add_params(selection_buro), bar_chart.add_params(
+        selection_buro
     )
+    # return (
+    #     ((base + points) | bar_chart)
+    #     .resolve_scale(color="shared")
+    #     .add_params(selection_buro)
+    # )
 
 
 def get_vehicle_chart(
@@ -499,7 +503,7 @@ def get_calendar_chart(
         .encode(
             x=alt.X("dayname:O", sort=order),
             y=alt.Y("week:O", title=None, axis=alt.Axis(labels=False)),
-            row=alt.Row("monthname:O", sort=month_order,spacing=0),
+            row=alt.Row("monthname:O", sort=month_order, spacing=0),
         )
         .properties(width=int(w), height=int(h / 3))
     )
@@ -526,7 +530,7 @@ def get_calendar_chart(
                 alt.value(1),
                 alt.value(0.2),
             ),
-            tooltip=["datetime"],
+            tooltip=["datetime:T"],
             # opacity = alt.condition(selection_day_aux,alt.value(1),alt.value(0.2))
         )
         .interactive()
@@ -580,9 +584,7 @@ def get_calendar_chart(
     #     .add_params(selection_weekday)
     # )
 
-    return (((calendars))).add_params(
-        selection_weekday, selection_month
-    )
+    return (((calendars))).add_params(selection_weekday, selection_month)
 
 
 def get_time_of_day_chart(
