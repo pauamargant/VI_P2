@@ -44,16 +44,20 @@ st.title("NYC Traffic Accidents")
 st.write(vis)
 print("done")
 
-# # make sidebar with instructions
-# with st.sidebar:
-#     st.title("Instructions")
-#     st.write(
-#         """This app allows you to explore the relationship between weather and traffic accidents in NYC.
-#          Throughout the visualization you can click on specific items in  order to select them, which will update the rest of the visualization to show only the data that matches your selection.
-#          You can also hover over the data to see more information about it.
-#          At the bottom of the graph, dropwdown menus are also included to further filter the data.
-#         """
-#     )
-#     st.write(
-#         "For further help, more detailed instructions on how to use it are available by going to the instructions page"
-#     )
+# make sidebar with instructions
+with st.sidebar:
+    if st.button("Reset graph (FOR DEVELOPMENT ONLY))"):
+        get_graph.clear()
+    if st.button("Clear Selection"):
+        st.write("Clearing selection")
+    st.title("Instructions")
+    st.write(
+        """This app allows you to explore the relationship between weather and traffic accidents in NYC.
+         Throughout the visualization you can click on specific items in  order to select them, which will update the rest of the visualization to show only the data that matches your selection.
+         You can also hover over the data to see more information about it.
+         At the bottom of the graph, dropwdown menus are also included to further filter the data.
+        """
+    )
+    st.write(
+        "For further help, more detailed instructions on how to use it are available by going to the instructions page"
+    )
