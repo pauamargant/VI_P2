@@ -53,10 +53,10 @@ def get_buroughs():
     path = get_path("nybb")
     buroughs = gpd.read_file(path).to_crs("EPSG:4326")
 
-    ny_df = pd.DataFrame()
-    ny_df["x"] = buroughs.centroid.x
-    ny_df["y"] = buroughs.centroid.y
-    ny_df["BoroName"] = buroughs.index
+    # ny_df = pd.DataFrame()
+    # ny_df["x"] = buroughs.centroid.x
+    # ny_df["y"] = buroughs.centroid.y
+    # ny_df["BoroName"] = buroughs.index
     return buroughs.reset_index()
 
 
@@ -499,7 +499,7 @@ def get_calendar_chart(
         .encode(
             x=alt.X("dayname:O", sort=order),
             y=alt.Y("week:O", title=None, axis=alt.Axis(labels=False)),
-            row=alt.Row("monthname:O", sort=month_order),
+            row=alt.Row("monthname:O", sort=month_order,spacing=0),
         )
         .properties(width=int(w), height=int(h / 3))
     )
@@ -526,7 +526,7 @@ def get_calendar_chart(
                 alt.value(1),
                 alt.value(0.2),
             ),
-            tooltip=["CRASH DATE"],
+            tooltip=["datetime"],
             # opacity = alt.condition(selection_day_aux,alt.value(1),alt.value(0.2))
         )
         .interactive()
@@ -542,25 +542,25 @@ def get_calendar_chart(
     #         alt.value(0.2),
     #     ),
     # )
-    month_bar = (
-        alt.Chart(accident_data)
-        .mark_bar()
-        .transform_filter(
-            selection_cond
-            & selection_buro
-            & selection_vehicle
-            & time_brush
-            & selection_acc_map
-        )
-        .encode(
-            x=alt.X(
-                "count()", scale=alt.Scale(reverse=False), axis=alt.Axis(title=None)
-            ),
-            y=alt.Y("month:O", title=None),
-            opacity=alt.condition(selection_month, alt.value(1), alt.value(0.2)),
-        )
-        .properties(width=int(w / 3), height=h)
-    )
+    # month_bar = (
+    #     alt.Chart(accident_data)
+    #     .mark_bar()
+    #     .transform_filter(
+    #         selection_cond
+    #         & selection_buro
+    #         & selection_vehicle
+    #         & time_brush
+    #         & selection_acc_map
+    #     )
+    #     .encode(
+    #         x=alt.X(
+    #             "count()", scale=alt.Scale(reverse=False), axis=alt.Axis(title=None)
+    #         ),
+    #         y=alt.Y("month:O", title=None),
+    #         opacity=alt.condition(selection_month, alt.value(1), alt.value(0.2)),
+    #     )
+    #     .properties(width=int(w / 3), height=h)
+    # )
     # weekday_bar = (
     #     alt.Chart(accident_data)
     #     .mark_bar()
@@ -580,7 +580,7 @@ def get_calendar_chart(
     #     .add_params(selection_weekday)
     # )
 
-    return (((calendars).facet(row="month:O", spacing=0))).add_params(
+    return (((calendars))).add_params(
         selection_weekday, selection_month
     )
 
