@@ -87,7 +87,7 @@ def get_accident_data(fname, sample=False):
     # filter year 2018 only
     df = df[df["date"].dt.year == 2018]
     # filter june, july, august
-    df = df[df["date"].dt.month.isin([6, 7, 8])]
+    df = df[df["date"].dt.month.isin([6, 7, 8, 9])]
     if sample:
         df = df.sample(1000)
     # Create a column for weekday/weekend
