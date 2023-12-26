@@ -734,3 +734,40 @@ def get_factor_chart(
         .add_params(selection_acc_factor)
         .properties(title="Top 10 Contributing Factors")
     )
+
+
+def make_visualization(accident_data):
+    colors = {"bg": "#eff0f3", "col1": "#d8b365", "col2": "#5ab4ac"}
+    w = 600
+    h = 400
+    ratio = 0.2
+    selection_cond = alt.selection_point(on="click",  fields=["conditions"])
+    selection_acc_map = alt.selection_interval()
+    selection_buro = alt.selection_point(fields=["name"])
+    selection_vehicle = alt.selection_multi(on="click", fields=["VEHICLE TYPE CODE 1"])
+    time_brush = alt.selection_point(fields=["HOUR"])
+
+    selection_weekday = alt.selection_point(fields=['weekday'])
+
+    month_dropdown = alt.binding_select(options=[[6,7,8,9],6,7,8,9],name='month', labels=['All','June','July','August','September'])
+    selection_month = alt.selection_point(fields=['month'])
+    selection_acc_factor = alt.selection_point(fields=['CONTRIBUTING FACTOR VEHICLE 1'])
+
+    cols = ['CRASH DATE','LATITUDE','LONGITUDE','date','HOUR','week','weekday','month','name','conditions','VEHICLE TYPE CODE 1','CONTRIBUTING FACTOR VEHICLE 1','dayname','monthname']
+
+    accident_data = accident_data[cols]
+
+    
+    w=1000
+    geo_view, bur_chart=get_map_chart(accident_data, selection_cond, selection_buro, selection_acc_map,selection_month, selection_weekday, selection_vehicle, time_brush,selection_acc_factor,  h1=600,h2 = 350, w=w,ratio=.7)
+    weather = get_weather_chart(accident_data,selection_buro,selection_acc_map,selection_cond,selection_month,selection_weekday, selection_vehicle, time_brush,selection_acc_factor,  h=399,w=w*0.8,ratio=0.8)
+    calendar = get_calendar_chart(accident_data,selection_buro,selection_acc_map,selection_cond,selection_month,selection_weekday, selection_vehicle, time_brush,selection_acc_factor,  h=399,w=w*0.3)
+    vehicles = get_vehicle_chart(accident_data, selection_buro,selection_acc_map,selection_cond, selection_month, selection_weekday, selection_vehicle, time_brush,selection_acc_factor,h=200,w=w*.3)
+    time_of_day = get_time_of_day_chart(accident_data, selection_buro,selection_acc_map,selection_cond, selection_month, selection_weekday, selection_vehicle, time_brush,selection_acc_factor,h=399)
+    acc_factor = get_factor_chart(accident_data, selection_buro,selection_acc_map,selection_cond, selection_month, selection_weekday, selection_vehicle, time_brush,selection_acc_factor,h=399,w=w*0.3)
+    # .configure_scale(
+    #     bandPaddingInner=.1).add_params(date_selector,month_selection, weekday_selection)
+
+    chart = ((geo_view| (bur_chart & vehicles)) & (weather | acc_factor).resolve_scale(color="independent")  & (calendar| time_of_day).resolve_scale(color='independent')).configure_scale(bandPaddingInner=0)
+
+    return chart
