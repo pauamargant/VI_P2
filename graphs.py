@@ -27,6 +27,15 @@ seq = [
     "#d2ffff",
 ]
 
+filter_cols = [
+    "name",
+    "monthname",
+    "VEHICLE TYPE CODE 1",
+    "HOUR",
+    "dayname",
+    "CONTRIBUTING FACTOR VEHICLE 1",
+]
+
 
 def get_map():
     """
@@ -186,6 +195,7 @@ def get_map_chart(
     #     from_=alt.LookupData(accident_data, "BoroName"),
     # )
     # .add_params(selection_buro)
+    accident_data = accident_data[filter_cols + ["LONGITUDE"] + ["LATITUDE"]]
     points = (
         alt.Chart(accident_data)
         .transform_filter(
@@ -263,6 +273,7 @@ def get_vehicle_chart(
     Returns:
     - layered_chart: LayeredChart - The layered bar chart visualizing the data.
     """
+    df = df[filter_cols]
     bar_chart = (
         alt.Chart(df)
         .transform_filter(
@@ -274,10 +285,6 @@ def get_vehicle_chart(
             & selection_acc_map
             & selection_acc_factor
         )
-        .transform_joinaggregate(day_count="count()", groupby=["date"])
-        .transform_joinaggregate(per_day_cond="mean(day_count)", groupby=["conditions"])
-        .transform_joinaggregate(per_day_mean="mean(day_count)", groupby=[])
-        .transform_calculate(diff="datum.per_day_cond - datum.per_day_mean")
         .mark_bar()
         .encode(
             y=alt.Y(
@@ -477,6 +484,8 @@ def get_calendar_chart(
     h=300,
     ratio=0.8,
 ):
+    accident_data = accident_data[filter_cols + ["week"]]
+
     order = [
         "Monday",
         "Tuesday",
@@ -491,7 +500,6 @@ def get_calendar_chart(
     # accident_data = accident_data[["date", "weekday", "month", "week","CRASH DATE"]]
     base = (
         alt.Chart(accident_data)
-        .mark_rect()
         .transform_filter(
             selection_cond
             & selection_buro
@@ -500,52 +508,89 @@ def get_calendar_chart(
             & selection_acc_map
             & selection_acc_factor
         )
+        .mark_rect() #shape="square", filled=True, size=w * 3.5
         .encode(
             x=alt.X("dayname:O", sort=order),
             y=alt.Y("week:O", title=None, axis=alt.Axis(labels=False)),
-            row=alt.Row("monthname:O", sort=month_order, spacing=0),
+            # row=alt.Row("monthname:O", sort=month_order, spacing=0),
         )
         .properties(width=int(w), height=int(h / 3))
     )
 
-    calendars = (
-        alt.Chart(accident_data)
-        .transform_filter(
-            selection_cond
-            & selection_buro
-            & selection_vehicle
-            & time_brush
-            & selection_acc_map
-            & selection_acc_factor
-        ).configure_areamark_rect(stroke="grey")
-        .transform_filter(
-            selection_cond
-            & selection_buro
-            & selection_vehicle
-            & time_brush
-            & selection_acc_map
-            & selection_acc_factor
-        )
-        .encode(
-            # x = alt.X('weekday'),
-            # y = alt.Y('week:O'),
-            color=alt.Color(
-                "count()",
-                scale=alt.Scale(scheme="lightmulti"),
-            ),
-            opacity=alt.condition(
-                (selection_month & selection_weekday),
-                alt.value(1),
-                alt.value(0.2),
-            ),
-            tooltip=["datetime:T"],
-           x=alt.X("dayname:O", sort=order),
-            y=alt.Y("week:O", title=None, axis=alt.Axis(labels=False)),
-            row=alt.Row("monthname:O", sort=month_order, spacing=0),
-        )
-        .properties(width=int(w), height=int(h / 3))
-        .interactive()
-    )
+    calendars = base.encode(
+        row=alt.Row("monthname:O", sort=month_order, spacing=0),
+        color=alt.Color(
+            "count()",
+            scale=alt.Scale(scheme="lightmulti"),
+        ),
+        opacity=alt.condition(
+            (selection_month & selection_weekday),
+            alt.value(1),
+            alt.value(0.2),
+        ),
+        tooltip=["datetime:T", "count()", "monthname"],
+    ).add_params(
+        selection_weekday
+    )  # .interactive()
+
+    # base = (
+    #     alt.Chart(accident_data)
+    #     .mark_rect()
+    #     .transform_filter(
+    #         selection_cond
+    #         & selection_buro
+    #         & selection_vehicle
+    #         & time_brush
+    #         & selection_acc_map
+    #         & selection_acc_factor
+    #     )
+    #     .encode(
+    #         x=alt.X("dayname:O", sort=order),
+    #         y=alt.Y("week:O", title=None, axis=alt.Axis(labels=False)),
+    #         row=alt.Row("monthname:O", sort=month_order, spacing=0),
+    #     )
+    #     .properties(width=int(w), height=int(h / 3))
+    # )
+
+    # calendars = (
+    #     alt.Chart(accident_data)
+    #     .transform_filter(
+    #         selection_cond
+    #         & selection_buro
+    #         & selection_vehicle
+    #         & time_brush
+    #         & selection_acc_map
+    #         & selection_acc_factor
+    #     )
+    #     .mark_rect(stroke="grey")
+    #     .transform_filter(
+    #         selection_cond
+    #         & selection_buro
+    #         & selection_vehicle
+    #         & time_brush
+    #         & selection_acc_map
+    #         & selection_acc_factor
+    #     )
+    #     .encode(
+    #         # x = alt.X('weekday'),
+    #         # y = alt.Y('week:O'),
+    #         color=alt.Color(
+    #             "count()",
+    #             scale=alt.Scale(scheme="lightmulti"),
+    #         ),
+    #         opacity=alt.condition(
+    #             (selection_month & selection_weekday),
+    #             alt.value(1),
+    #             alt.value(0.2),
+    #         ),
+    #         tooltip=["datetime:T"],
+    #         x=alt.X("dayname:O", sort=order),
+    #         y=alt.Y("week:O", title=None, axis=alt.Axis(labels=False)),
+    #         row=alt.Row("monthname:O", sort=month_order, spacing=0),
+    #     )
+    #     .properties(width=int(w), height=int(h / 3))
+    #     .add_params(selection_weekday)
+    # )
 
     # numbers = base.mark_text(baseline="middle").encode(
     #     # x = alt.X('weekday'),
@@ -595,7 +640,7 @@ def get_calendar_chart(
     #     .add_params(selection_weekday)
     # )
 
-    return (((calendars))).add_params(selection_weekday)
+    return calendars
 
 
 def get_time_of_day_chart(
@@ -611,6 +656,7 @@ def get_time_of_day_chart(
     w=600,
     h=300,
 ):
+    df = df[filter_cols]
     h1 = int(2 * h / 3)
     h2 = int(1 * h / 3)
     w1 = int(3 * w / 4)
@@ -620,7 +666,7 @@ def get_time_of_day_chart(
     base = (
         alt.Chart(df)
         .mark_rect()
-        .encode(x=alt.X("HOUR:O"), y=alt.Y("weekday:O"))
+        .encode(x=alt.X("HOUR:O"), y=alt.Y("dayname:O"))
         .transform_filter(
             selection_cond
             & selection_buro
@@ -628,7 +674,6 @@ def get_time_of_day_chart(
             & selection_acc_map
             & selection_acc_factor
             & selection_month
-            & selection_weekday
         )
     )
 
@@ -668,7 +713,6 @@ def get_time_of_day_chart(
             & selection_acc_map
             & selection_acc_factor
             & selection_month
-            & selection_weekday
         )
         .encode(
             y=alt.Y("count()", scale=alt.Scale(reverse=False)),
@@ -691,11 +735,10 @@ def get_time_of_day_chart(
             & selection_acc_map
             & selection_acc_factor
             & selection_month
-            & selection_weekday
         )
         .encode(
             x=alt.X("count()"),
-            y=alt.Y("weekday:O", axis=None),
+            y=alt.Y("dayname:O", axis=None),
             opacity=alt.condition(selection_weekday, alt.value(1), alt.value(0.2)),
             tooltip=["count()"],
         )
@@ -723,6 +766,7 @@ def get_factor_chart(
     w=600,
     h=300,
 ):
+    df = df[filter_cols]
     return (
         alt.Chart(df)
         .mark_bar()
@@ -759,20 +803,27 @@ def make_visualization(accident_data):
     w = 600
     h = 400
     ratio = 0.2
+
     selection_cond = alt.selection_point(on="click", fields=["conditions"])
     selection_acc_map = alt.selection_interval()
     selection_buro = alt.selection_point(fields=["name"])
-    selection_vehicle = alt.selection_point(on="click", fields=["VEHICLE TYPE CODE 1"])
+    selection_vehicle = alt.selection_multi(on="click", fields=["VEHICLE TYPE CODE 1"])
     time_brush = alt.selection_point(fields=["HOUR"])
 
-    selection_weekday = alt.selection_point(fields=["weekday"])
+    selection_weekday = alt.selection_point(fields=["dayname"])
 
     month_dropdown = alt.binding_select(
-        options=[[6, 7, 8, 9], 6, 7, 8, 9],
+        options=[
+            "June, July, August, September",
+            "June",
+            "July",
+            "August",
+            "September",
+        ],
         name="month",
         labels=["All", "June", "July", "August", "September"],
     )
-    selection_month = alt.selection_point(fields=["month"], bind=month_dropdown)
+    selection_month = alt.selection_point(fields=["monthname"])
     selection_acc_factor = alt.selection_point(fields=["CONTRIBUTING FACTOR VEHICLE 1"])
 
     cols = [
