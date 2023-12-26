@@ -509,7 +509,15 @@ def get_calendar_chart(
     )
 
     calendars = (
-        base.mark_rect(stroke="grey")
+        alt.Chart(accident_data)
+        .transform_filter(
+            selection_cond
+            & selection_buro
+            & selection_vehicle
+            & time_brush
+            & selection_acc_map
+            & selection_acc_factor
+        ).configure_areamark_rect(stroke="grey")
         .transform_filter(
             selection_cond
             & selection_buro
@@ -531,8 +539,11 @@ def get_calendar_chart(
                 alt.value(0.2),
             ),
             tooltip=["datetime:T"],
-            # opacity = alt.condition(selection_day_aux,alt.value(1),alt.value(0.2))
+           x=alt.X("dayname:O", sort=order),
+            y=alt.Y("week:O", title=None, axis=alt.Axis(labels=False)),
+            row=alt.Row("monthname:O", sort=month_order, spacing=0),
         )
+        .properties(width=int(w), height=int(h / 3))
         .interactive()
     )
 
@@ -584,7 +595,7 @@ def get_calendar_chart(
     #     .add_params(selection_weekday)
     # )
 
-    return (((calendars))).add_params(selection_weekday, selection_month)
+    return (((calendars))).add_params(selection_weekday)
 
 
 def get_time_of_day_chart(
@@ -616,6 +627,8 @@ def get_time_of_day_chart(
             & selection_vehicle
             & selection_acc_map
             & selection_acc_factor
+            & selection_month
+            & selection_weekday
         )
     )
 
@@ -654,6 +667,8 @@ def get_time_of_day_chart(
             & selection_vehicle
             & selection_acc_map
             & selection_acc_factor
+            & selection_month
+            & selection_weekday
         )
         .encode(
             y=alt.Y("count()", scale=alt.Scale(reverse=False)),
@@ -675,6 +690,8 @@ def get_time_of_day_chart(
             & selection_vehicle
             & selection_acc_map
             & selection_acc_factor
+            & selection_month
+            & selection_weekday
         )
         .encode(
             x=alt.X("count()"),
@@ -686,12 +703,10 @@ def get_time_of_day_chart(
         .add_params(selection_weekday)
         .interactive()
     )
-    time_chart = hour_bar & (times_of_day | weekday_bar)
-    
     # time_chart = (
     #     hour_bar & (times_of_day | weekday_bar).resolve_scale(y="shared")
     # ).resolve_scale(x="shared", color="shared")
-    
+    time_chart = hour_bar & (times_of_day | weekday_bar)
     return time_chart
 
 
@@ -747,7 +762,7 @@ def make_visualization(accident_data):
     selection_cond = alt.selection_point(on="click", fields=["conditions"])
     selection_acc_map = alt.selection_interval()
     selection_buro = alt.selection_point(fields=["name"])
-    selection_vehicle = alt.selection_multi(on="click", fields=["VEHICLE TYPE CODE 1"])
+    selection_vehicle = alt.selection_point(on="click", fields=["VEHICLE TYPE CODE 1"])
     time_brush = alt.selection_point(fields=["HOUR"])
 
     selection_weekday = alt.selection_point(fields=["weekday"])
@@ -757,7 +772,7 @@ def make_visualization(accident_data):
         name="month",
         labels=["All", "June", "July", "August", "September"],
     )
-    selection_month = alt.selection_point(fields=["month"])
+    selection_month = alt.selection_point(fields=["month"], bind=month_dropdown)
     selection_acc_factor = alt.selection_point(fields=["CONTRIBUTING FACTOR VEHICLE 1"])
 
     cols = [
@@ -863,10 +878,15 @@ def make_visualization(accident_data):
     # .configure_scale(
     #     bandPaddingInner=.1).add_params(date_selector,month_selection, weekday_selection)
 
+    # chart = (
+    #     (geo_view | (bur_chart & vehicles))
+    #     & (weather | acc_factor).resolve_scale(color="independent")
+    #     & (calendar.add_params(selection_month) | time_of_day).resolve_scale(color="independent")
+    # ).configure_scale(bandPaddingInner=0)
     chart = (
         (geo_view | (bur_chart & vehicles))
         & (weather | acc_factor)
-        & (calendar | time_of_day)
+        & (calendar.add_params(selection_month) | time_of_day)
     )
 
     return chart
