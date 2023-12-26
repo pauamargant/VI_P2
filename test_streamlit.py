@@ -5,7 +5,7 @@ import streamlit as st
 st.set_page_config(layout="wide", page_title="NYC Traffic Accidents")
 
 
-@st.cache_data
+# @st.cache_data
 def get_data():
     data = get_accident_data(fname="dataset_v1.csv", sample=False)
     accident_data = get_weather_data(data, fname="weather.csv")
@@ -31,15 +31,17 @@ def get_data():
     return accident_data
 
 
-@st.cache_data
-def get_graph():
-    data = get_data()
+data = get_data()
+
+
+# @st.cache_data
+def get_graph(data):
     vis = make_visualization(data)
     return vis
 
 
 data = get_data()
-vis = get_graph()
+vis = get_graph(data)
 st.title("NYC Traffic Accidents")
 st.write(vis)
 print("done")
