@@ -454,7 +454,7 @@ def get_calendar_chart(
         "Sunday",
     ]
     month_order = ["June", "July", "August", "September"]
-    
+
     # accident_data["fulldate"] = (
     #     accident_data["monthname"]
     #     + " "
@@ -477,7 +477,7 @@ def get_calendar_chart(
         )
         .mark_rect()
         .encode(
-            row=alt.Row("monthname:O", sort=month_order, spacing=0, title=None, axis = alt.Axis(labels=False)),
+            row=alt.Row("monthname:O", sort=month_order, spacing=0, title=None),
             x=alt.X("dayname:O", sort=order, axis=alt.Axis(title=None)),
             y=alt.Y("week:O", title=None, axis=alt.Axis(labels=False)),
             color=alt.Color(
@@ -511,14 +511,18 @@ def get_calendar_chart(
             & selection_acc_factor
         )
         .encode(
-            y = alt.Y("monthname:O", sort=month_order, title=None,axis = alt.Axis(labels=False, ticks=False)),
-            color = alt.Color("monthname:N", legend=None),
+            y=alt.Y(
+                "monthname:O",
+                sort=month_order,
+                title=None,
+                axis=alt.Axis(labels=False, ticks=False),
+            ),
+            color=alt.Color("monthname:N", legend=None),
             opacity=alt.condition(selection_month, alt.value(1), alt.value(0.2)),
         )
-        .properties(width=int(w/4), height=int(h))
+        .properties(width=int(w / 4), height=int(h))
         .add_params(selection_month)
     )
-
 
     # base = (
     #     alt.Chart(accident_data)
@@ -627,7 +631,7 @@ def get_calendar_chart(
     #     .add_params(selection_weekday)
     # )
 
-    return (month_bar|calendars ).add_params(selection_month)
+    return (month_bar | calendars).add_params(selection_month)
 
 
 def get_time_of_day_chart(
