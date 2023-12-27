@@ -49,7 +49,7 @@ vis = make_visualization(accident_data)
 st.title("NYC Traffic Accidents")
 
 
-st.altair_chart(vis, use_container_width=True)
+st.altair_chart(vis)
 print("done")
 
 # make sidebar with instructions
@@ -64,6 +64,8 @@ with st.sidebar:
          Throughout the visualization you can click on specific items in  order to select them, which will update the rest of the visualization to show only the data that matches your selection.
          You can also hover over the data to see more information about it.
          At the bottom of the graph, dropwdown menus are also included to further filter the data.
+
+         **IMPORTANT**: In some cases the interactions may not work as expected. If this happens, please refresh the page and try again.
         """
     )
     st.write(
