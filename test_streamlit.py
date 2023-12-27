@@ -40,16 +40,34 @@ def get_graph(data):
     return vis
 
 
-data = get_data()
-vis = get_graph(data)
+# data = get_data()
+# vis = get_graph(data)
+data = get_accident_data(fname="dataset_v1.csv")
+accident_data = get_weather_data(data)
+# vis = make_visualization(accident_data)
 st.title("NYC Traffic Accidents")
-st.write(vis)
+
+# make count of VEHICLE TYPE CODE 1 altair chart
+st.header("Count of Vehicle Type Code 1")
+st.write(
+    "This chart shows the count of the different types of vehicles involved in accidents in NYC in 2018. Hover over the bars to see the exact count of each vehicle type."
+)
+chart = (
+    alt.Chart(accident_data)
+    .mark_bar()
+    .encode(
+        x=alt.X("count()", title="Count"),
+        y=alt.Y("VEHICLE TYPE CODE 1", title="Vehicle Type"),
+        tooltip=["VEHICLE TYPE CODE 1", "count()"],
+    )
+)
+# st.altair_chart(vis, use_container_width=True)
 print("done")
 
 # make sidebar with instructions
 with st.sidebar:
     if st.button("Reset graph (FOR DEVELOPMENT ONLY))"):
-        get_graph.clear()
+        get_graph.clear_cache()
     if st.button("Clear Selection"):
         st.write("Clearing selection")
     st.title("Instructions")
