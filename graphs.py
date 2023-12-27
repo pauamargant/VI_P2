@@ -452,11 +452,12 @@ def get_weather_chart(
     #     .properties(width=w * ratio, height=h)
     #     .add_params(selection_cond)
     # )
+    custom_sort = ['Clear', 'Partially cloudy', 'Overcast', 'Rain', 'Rain, Overcast', 'Rain, Partially cloudy']
     bar_legend = (
         alt.Chart(accident_data)
         .mark_rect()
         .encode(
-            y=alt.Y("conditions:N"),
+            y=alt.Y("conditions:N", sort= custom_sort),
             color="count()",
             opacity=alt.condition(selection_cond, alt.value(1), alt.value(0.2)),
         )
@@ -672,12 +673,15 @@ def get_time_of_day_chart(
     h2 = int(1 * h / 3)
     w1 = int(3 * w / 4)
     w2 = int(w / 4)
+    
+    custom_sort = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+
     # select only columns HOUR, weekday
     # df = df[["HOUR", "weekday"]]
     base = (
         alt.Chart()
         .mark_rect()
-        .encode(x=alt.X("HOUR:O"), y=alt.Y("dayname:O"))
+        .encode(x=alt.X("HOUR:O", axis=alt.Axis(title="Hour of the day")), y=alt.Y("dayname:O", sort = custom_sort, axis=alt.Axis(title=None)))
         .transform_filter(
             selection_cond
             & selection_buro
@@ -696,6 +700,7 @@ def get_time_of_day_chart(
             color=alt.Color(
                 "count()",
                 scale=alt.Scale(scheme="tealblues"),
+                legend=alt.Legend(title="Number of accidents"),
             ),
             opacity=alt.condition(
                 time_brush & selection_weekday, alt.value(1), alt.value(0.2)
@@ -725,7 +730,7 @@ def get_time_of_day_chart(
             & selection_month
         )
         .encode(
-            y=alt.Y("count()", scale=alt.Scale(reverse=False)),
+            y=alt.Y("count()", scale=alt.Scale(reverse=False), axis=alt.Axis(title="No. accidents")),
             x=alt.X("HOUR:O", axis=None),
             opacity=alt.condition(time_brush, alt.value(1), alt.value(0.2)),
             tooltip=["count()"],
@@ -746,8 +751,8 @@ def get_time_of_day_chart(
             & selection_month
         )
         .encode(
-            x=alt.X("count()"),
-            y=alt.Y("dayname:O", axis=None),
+            x=alt.X("count()", axis=alt.Axis(title="No. accidents")),
+            y=alt.Y("dayname:O", axis=None, sort = custom_sort),
             opacity=alt.condition(selection_weekday, alt.value(1), alt.value(0.2)),
             tooltip=["count()"],
         )
@@ -792,12 +797,21 @@ def get_factor_chart(
             & time_brush
         )
         .encode(
-            x=alt.X(
+            y=alt.Y(
                 "CONTRIBUTING FACTOR VEHICLE 1:N",
-                axis=alt.Axis(title="Contributing Factor"),
-            ),
-            y=alt.Y("count():Q", axis=alt.Axis(title="Count")),
+                axis=alt.Axis(title=None),
+            ).sort("-x"),
+            
+            x=alt.X("counter:Q", axis=alt.Axis(title="No. accidents")),
+            
             opacity=alt.condition(selection_acc_factor, alt.value(1), alt.value(0.2)),
+        )
+        .transform_aggregate(counter="count()", groupby=["CONTRIBUTING FACTOR VEHICLE 1"])
+        .transform_window(
+            rank='rank(counter)',
+            sort=[alt.SortField('counter', order='descending')]
+        ).transform_filter(
+            (alt.datum.rank <= 10)
         )
         # .transform_aggregate(count="count()", groupby=["CONTRIBUTING FACTOR VEHICLE 1"])
         # .transform_window(
@@ -807,6 +821,7 @@ def get_factor_chart(
         # .transform_filter("datum.rank <= 10")
         .add_params(selection_acc_factor)
         .properties(title="Top 10 Contributing Factors")
+        
     )
 
 

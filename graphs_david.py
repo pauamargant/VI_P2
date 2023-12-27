@@ -14,7 +14,7 @@ import numpy as np
 # we disable max_rows in altair
 alt.data_transformers.disable_max_rows()
 
-colors = {"bg": "#eff0f3", "col1": "#4f8c9d", "col2": "#6ceac0","col3":"#c3dee6"}
+colors = {"bg": "#eff0f3", "col1": "#4f8c9d", "col2": "#6ceac0", "col3": "#c3dee6"}
 seq = [
     "#4f8c9d",
     "#5f9aa9",
@@ -25,6 +25,16 @@ seq = [
     "#b0e1e5",
     "#c1f0f2",
     "#d2ffff",
+]
+
+filter_cols = [
+    "name",
+    "monthname",
+    "VEHICLE TYPE CODE 1",
+    "HOUR",
+    "dayname",
+    "CONTRIBUTING FACTOR VEHICLE 1",
+    "conditions",
 ]
 
 
@@ -53,10 +63,10 @@ def get_buroughs():
     path = get_path("nybb")
     buroughs = gpd.read_file(path).to_crs("EPSG:4326")
 
-    ny_df = pd.DataFrame()
-    ny_df["x"] = buroughs.centroid.x
-    ny_df["y"] = buroughs.centroid.y
-    ny_df["BoroName"] = buroughs.index
+    # ny_df = pd.DataFrame()
+    # ny_df["x"] = buroughs.centroid.x
+    # ny_df["y"] = buroughs.centroid.y
+    # ny_df["BoroName"] = buroughs.index
     return buroughs.reset_index()
 
 
@@ -73,13 +83,12 @@ def get_accident_data(fname, sample=False):
     """
     df = pd.read_csv(fname)
 
-  
     # Parse the date column as a date
     df["date"] = pd.to_datetime(df["CRASH DATE"])  # , format="%Y-%m-%d")
     # filter year 2018 only
     df = df[df["date"].dt.year == 2018]
     # filter june, july, august
-    df = df[df["date"].dt.month.isin([6, 7, 8])]
+    df = df[df["date"].dt.month.isin([6, 7, 8, 9])]
     if sample:
         df = df.sample(1000)
     # Create a column for weekday/weekend
@@ -115,18 +124,14 @@ def get_accident_data(fname, sample=False):
     # month column
     df["month"] = df["date"].dt.month
 
-    df["dayname"] = df["date"].dt.day_name()
-    df["monthname"] = df["date"].dt.month_name()
-
-
-
-
-
     # # for each month get the minimum week number
     min_week = df.groupby(["month"])["week"].min().reset_index()
     # # merge with accident data
     df = pd.merge(df, min_week, on="month", how="left")
     df["week"] = df["week_x"] - df["week_y"] + 1
+
+    df["dayname"] = df["date"].dt.day_name()
+    df["monthname"] = df["date"].dt.month_name()
 
     burough_map = get_buroughs()
     df = df.dropna(subset=["LATITUDE", "LONGITUDE"])
@@ -138,7 +143,9 @@ def get_accident_data(fname, sample=False):
     gdf = pd.DataFrame(gdf)
 
     # create properties.name column equal to BoroName
-    gdf["properties.name"] = gdf["BoroName"]
+    # gdf["properties.name"] = gdf["BoroName"]
+    # rename BoroName to name
+    gdf = gdf.rename(columns={"BoroName": "name"})
     # make column month_number- week_number
     gdf["month-week"] = gdf["month"].astype(str) + "-" + gdf["week"].astype(str)
 
@@ -156,9 +163,11 @@ def get_map_chart(
     selection_month,
     selection_weekday,
     selection_vehicle,
-    selection_time,
+    time_brush,
+    selection_acc_factor,
     w=400,
-    h=400,
+    h1=400,
+    h2=200,
     ratio=0.8,
 ):
     ny = "https://raw.githubusercontent.com/pauamargant/VI_P1/main/resources/new-york-city-boroughs.geojson"
@@ -168,20 +177,25 @@ def get_map_chart(
 
     base = (
         alt.Chart(data_geojson_remote)
-        .mark_geoshape(fill=colors["col3"])
+        .mark_geoshape()  # fill=colors["col3"]
         .properties(
             width=500,
             height=300,
         )
         .project(type="albersUsa")
-        .encode(opacity=alt.condition(selection_buro, alt.value(0.8), alt.value(0.2)))
-        .properties(width=w * ratio, height=h)
+        .encode(
+            opacity=alt.condition(selection_buro, alt.value(0.6), alt.value(0.2)),
+            color=alt.Color("name:N"),
+            tooltip=["name:N"],
+        )
+        .properties(width=w * ratio, height=h1)
     )
     # .transform_lookup(
     #     lookup="name",
     #     from_=alt.LookupData(accident_data, "BoroName"),
     # )
     # .add_params(selection_buro)
+    accident_data = accident_data[filter_cols + ["LONGITUDE"] + ["LATITUDE"]]
     points = (
         alt.Chart(accident_data)
         .transform_filter(
@@ -189,14 +203,15 @@ def get_map_chart(
             & selection_month
             & selection_weekday
             & selection_vehicle
-            & selection_time
+            & time_brush
+            & selection_acc_factor
         )
         .mark_circle()
         .encode(
             longitude="LONGITUDE:Q",
             latitude="LATITUDE:Q",
             size=alt.value(2),
-            color=alt.Color('BoroName:N',legend=None),
+            color=alt.Color("name:N", legend=None),
             opacity=alt.condition(selection_buro, alt.value(1), alt.value(0)),
         )
         .add_params(selection_acc_map)
@@ -211,17 +226,27 @@ def get_map_chart(
             & selection_month
             & selection_weekday
             & selection_vehicle
-            & selection_time
+            & time_brush
             & selection_acc_map
+            & selection_acc_factor
         )
         .encode(
             x=alt.X("count()"),
-            y=alt.Y("BoroName:N"),
+            y=alt.Y("name:N").sort("-x"),
             opacity=alt.condition(selection_buro, alt.value(1), alt.value(0.4)),
+            color=alt.Color("name:N", legend=None),
+            tooltip=["name:N", "count()"],
         )
-        .properties(width=w * (1 - ratio), height=h)
+        .properties(width=w * (1 - ratio), height=h2)
     )
-    return (base + points) | bar_chart.add_params(selection_buro)
+    return (base + points).add_params(selection_buro), bar_chart.add_params(
+        selection_buro
+    )
+    # return (
+    #     ((base + points) | bar_chart)
+    #     .resolve_scale(color="shared")
+    #     .add_params(selection_buro)
+    # )
 
 
 def get_vehicle_chart(
@@ -232,7 +257,8 @@ def get_vehicle_chart(
     selection_month,
     selection_weekday,
     selection_vehicle,
-    selection_time,
+    time_brush,
+    selection_acc_factor,
     w=500,
     h=300,
 ):
@@ -247,6 +273,7 @@ def get_vehicle_chart(
     Returns:
     - layered_chart: LayeredChart - The layered bar chart visualizing the data.
     """
+    df = df[filter_cols]
     bar_chart = (
         alt.Chart(df)
         .transform_filter(
@@ -254,26 +281,22 @@ def get_vehicle_chart(
             & selection_month
             & selection_weekday
             & selection_cond
-            & selection_time
+            & time_brush
             & selection_acc_map
+            & selection_acc_factor
         )
-        .transform_joinaggregate(day_count="count()", groupby=["date"])
-        .transform_joinaggregate(per_day_cond="mean(day_count)", groupby=["conditions"])
-        .transform_joinaggregate(per_day_mean="mean(day_count)", groupby=[])
-        .transform_calculate(diff="datum.per_day_cond - datum.per_day_mean")
         .mark_bar()
         .encode(
             y=alt.Y(
                 "VEHICLE TYPE CODE 1:N",
                 title=None,
-                sort=alt.EncodingSortField(field="count", order="descending"),
-            ),
+            ).sort("x"),
             x=alt.X(
                 "count()",
                 title="Number of accidents"
                 # scale=alt.Scale(domain=(0, 50)),
             ),
-            color=alt.Color("VEHICLE TYPE CODE 1:N", legend=None),
+            # color=alt.Color("VEHICLE TYPE CODE 1:N", legend=None),
             tooltip=["VEHICLE TYPE CODE 1", "count()"],
             opacity=alt.condition(selection_vehicle, alt.value(1), alt.value(0.2)),
         )
@@ -291,12 +314,26 @@ def get_vehicle_chart(
         color=alt.value("black"),  # Set the text color to black for other categories,
     )
 
+    # add emojis to the end of the bar
+    text_emoji = (
+        bar_chart.mark_text(
+            align="left",
+            baseline="middle",
+            fontSize=30,
+            dx=0,  # Adjust the horizontal position of the labels
+        )
+        .encode(text=alt.Text("emoji:N"))
+        .transform_calculate(
+            emoji="{'AMBULANCE':'🚑','FIRE':'🚒','TAXI':'🚕'}[datum['VEHICLE TYPE CODE 1']]"
+        )
+    )
+
     """layered_chart = (
         alt.layer(bar_chart, text_labels)
         .configure_axisX(grid=True)
         .properties(width=width, height=height)
     )"""
-    return bar_chart + text_labels
+    return bar_chart + text_emoji
 
 
 def get_weather_data(
@@ -325,6 +362,8 @@ def get_weather_data(
 
     # We Merge weather conditions with accidents using pd.concat
     data = df.merge(weather_cond, left_on="date", right_on="datetime", how="inner")
+    print(data.columns)
+    # rename conditions_x to conditions
     return data
 
 
@@ -336,7 +375,8 @@ def get_weather_chart(
     selection_month,
     selection_weekday,
     selection_vehicle,
-    selection_time,
+    time_brush,
+    selection_acc_factor,
     w=500,
     h=300,
     ratio=0.8,
@@ -345,88 +385,86 @@ def get_weather_chart(
     # select only needed columns
     # accident_data = accident_data[["date", "conditions",'conditions']]
 
-    bars = (
-        alt.Chart(accident_data)
-        .transform_filter(
-            selection_buro
-            & selection_month
-            & selection_weekday
-            & selection_vehicle
-            & selection_time
-            & selection_acc_map
-        )
-        .transform_joinaggregate(day_count="count()", groupby=["date"])
-        .transform_joinaggregate(per_day_cond="mean(day_count)", groupby=["conditions"])
-        .transform_joinaggregate(per_day_mean="mean(day_count)", groupby=[])
-        .transform_calculate(diff="datum.per_day_cond - datum.per_day_mean")
-        .mark_bar(height=3, orient="horizontal")
-        .encode(
-            y=alt.Y("conditions:N").sort("x"),
-            x="min(diff):Q",
-            color=alt.condition(
-                alt.datum.diff > 0,
-                alt.value(colors["col2"]),  # The positive color
-                alt.value(colors["col1"]),  # The negative color
-            ),
-            fill=alt.condition(
-                alt.datum.diff > 0,
-                alt.value(colors["col2"]),  # The positive color
-                alt.value(colors["col1"]),  # The negative color
-            ),
-            opacity=alt.condition(selection_cond, alt.value(1), alt.value(0.2)),
-        )
-        .properties(width=w * ratio, height=h)
-        .add_params(selection_cond)
-    )
-    dots = (
-        alt.Chart(accident_data)
-        .transform_filter(
-            selection_buro
-            & selection_month
-            & selection_weekday
-            & selection_vehicle
-            & selection_time
-        )
-        .transform_joinaggregate(day_count="count()", groupby=["date"])
-        .transform_joinaggregate(per_day_cond="mean(day_count)", groupby=["conditions"])
-        .transform_joinaggregate(per_day_mean="mean(day_count)", groupby=[])
-        .transform_calculate(diff="datum.per_day_cond - datum.per_day_mean")
-        .mark_point(height=3, orient="horizontal", size=100)
-        .encode(
-            y=alt.Y("conditions:N").sort("x"),
-            x="min(diff):Q",
-            color=alt.condition(
-                alt.datum.diff > 0,
-                alt.value(colors["col2"]),  # The positive color
-                alt.value(colors["col1"]),  # The negative color
-            ),
-            fill=alt.condition(
-                alt.datum.diff > 0,
-                alt.value(colors["col2"]),  # The positive color
-                alt.value(colors["col1"]),  # The negative color
-            ),
-            opacity=alt.condition(selection_cond, alt.value(1), alt.value(0.2)),
-        )
-        .properties(width=w * ratio, height=h)
-        .add_params(selection_cond)
-    )
+    # bars = (
+    #     alt.Chart(accident_data)
+    #     .transform_filter(
+    #         selection_buro
+    #         & selection_month
+    #         & selection_weekday
+    #         & selection_vehicle
+    #         & time_brush
+    #         & selection_acc_map
+    #         & selection_acc_factor
+    #     )
+    #     .transform_joinaggregate(day_count="count()", groupby=["date"])
+    #     .transform_joinaggregate(per_day_cond="mean(day_count)", groupby=["conditions"])
+    #     .transform_joinaggregate(per_day_mean="mean(day_count)", groupby=[])
+    #     .transform_calculate(diff="datum.per_day_cond - datum.per_day_mean")
+    #     .mark_bar(height=3, orient="horizontal")
+    #     .encode(
+    #         y=alt.Y("conditions:N").sort("x"),
+    #         x="min(diff):Q",
+    #         color=alt.condition(
+    #             alt.datum.diff > 0,
+    #             alt.value(colors["col2"]),  # The positive color
+    #             alt.value(colors["col1"]),  # The negative color
+    #         ),
+    #         fill=alt.condition(
+    #             alt.datum.diff > 0,
+    #             alt.value(colors["col2"]),  # The positive color
+    #             alt.value(colors["col1"]),  # The negative color
+    #         ),
+    #         opacity=alt.condition(selection_cond, alt.value(1), alt.value(0.2)),
+    #     )
+    #     .properties(width=w * ratio, height=h)
+    #     .add_params(selection_cond)
+    # )
+    # dots = (
+    #     alt.Chart(accident_data)
+    #     .transform_filter(
+    #         selection_buro
+    #         & selection_month
+    #         & selection_weekday
+    #         & selection_vehicle
+    #         & time_brush
+    #         & selection_acc_factor
+    #     )
+    #     .transform_joinaggregate(day_count="count()", groupby=["date"])
+    #     .transform_joinaggregate(per_day_cond="mean(day_count)", groupby=["conditions"])
+    #     .transform_joinaggregate(per_day_mean="mean(day_count)", groupby=[])
+    #     .transform_calculate(diff="datum.per_day_cond - datum.per_day_mean")
+    #     .mark_point(height=3, orient="horizontal", size=100)
+    #     .encode(
+    #         y=alt.Y("conditions:N").sort("x"),
+    #         x="min(diff):Q",
+    #         color=alt.condition(
+    #             alt.datum.diff > 0,
+    #             alt.value(colors["col2"]),  # The positive color
+    #             alt.value(colors["col1"]),  # The negative color
+    #         ),
+    #         fill=alt.condition(
+    #             alt.datum.diff > 0,
+    #             alt.value(colors["col2"]),  # The positive color
+    #             alt.value(colors["col1"]),  # The negative color
+    #         ),
+    #         opacity=alt.condition(selection_cond, alt.value(1), alt.value(0.2)),
+    #     )
+    #     .properties(width=w * ratio, height=h)
+    #     .add_params(selection_cond)
+    # )
     bar_legend = (
         alt.Chart(accident_data)
         .mark_rect()
-        .transform_filter(selection_buro & selection_month & selection_weekday)
-        .transform_joinaggregate(day_count="count()", groupby=["date"])
-        .transform_joinaggregate(per_day_cond="mean(day_count)", groupby=["conditions"])
-        .transform_joinaggregate(per_day_mean="mean(day_count)", groupby=[])
-        .transform_calculate(diff="datum.per_day_cond - datum.per_day_mean")
         .encode(
-            y=alt.Y("conditions:N", sort=alt.EncodingSortField(field="diff")),
+            y=alt.Y("conditions:N"),
             color="count()",
             opacity=alt.condition(selection_cond, alt.value(1), alt.value(0.2)),
         )
         .properties(width=w * (1 - ratio), height=h)
         .add_params(selection_cond)
     )
-    return (bars + dots) | bar_legend
+    return bar_legend
+    # return (bars + ts) | bar_legend
 
 
 def get_calendar_chart(
@@ -437,43 +475,60 @@ def get_calendar_chart(
     selection_month,
     selection_weekday,
     selection_vehicle,
-    selection_time,
+    time_brush,
+    selection_acc_factor,
     w=200,
     h=300,
     ratio=0.8,
 ):
+    accident_data = accident_data[filter_cols + ["week"]]
+
+    order = [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday",
+    ]
+    month_order = ["June", "July", "August"]
     # select only needed columns
     # accident_data = accident_data[["date", "weekday", "month", "week","CRASH DATE"]]
-    order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-    month_order = ["June", "July", "August"]
-
-    
-    base = (
-        alt.Chart(accident_data)
-        .mark_rect()
-        .transform_filter(
-            selection_cond
-            & selection_buro
-            & selection_vehicle
-            & selection_time
-            & selection_acc_map
-        )
-        .encode(x=alt.X("dayname:O", sort = order), y=alt.Y("week:O", title = None, axis=alt.Axis(labels=False)), row = alt.Row("monthname:O", sort = month_order))
-        .properties(width=int(w), height=int(h / 3))
-    )
+    # base = (
+    #     alt.Chart(accident_data)
+    #     .transform_filter(
+    #         selection_cond
+    #         & selection_buro
+    #         & selection_vehicle
+    #         & time_brush
+    #         & selection_acc_map
+    #         & selection_acc_factor
+    #     )
+    #     .mark_rect() #shape="square", filled=True, size=w * 3.5
+    #     .encode(
+    #         x=alt.X("dayname:O", sort=order),
+    #         y=alt.Y("week:O", title=None, axis=alt.Axis(labels=False)),
+    #         # row=alt.Row("monthname:O", sort=month_order, spacing=0),
+    #     )
+    #     .properties(width=int(w), height=int(h / 3))
+    # )
 
     calendars = (
-        base.mark_rect(stroke="grey")
+        alt.Chart(accident_data)
         .transform_filter(
             selection_cond
             & selection_buro
             & selection_vehicle
-            & selection_time
+            & time_brush
             & selection_acc_map
+            & selection_acc_factor
         )
+        .mark_rect()
         .encode(
-            # x = alt.X('weekday'),
-            # y = alt.Y('week:O'),
+            row=alt.Row("monthname:O", sort=month_order, spacing=0),
+            x=alt.X("dayname:O", sort=order),
+            y=alt.Y("week:O", title=None, axis=alt.Axis(labels=False)),
             color=alt.Color(
                 "count()",
                 scale=alt.Scale(scheme="lightmulti"),
@@ -483,39 +538,100 @@ def get_calendar_chart(
                 alt.value(1),
                 alt.value(0.2),
             ),
-            # opacity = alt.condition(selection_day_aux,alt.value(1),alt.value(0.2))
-        ).add_params(selection_month, selection_weekday)
-    )
+            tooltip=["datetime:T", "count()", "monthname"],
+        )
+        .add_params(selection_weekday, selection_month)
+        .properties(width=int(w), height=int(h / 3))
+    )  # .interactive()
 
-    numbers = base.mark_text(baseline="middle").encode(
-        # x = alt.X('weekday'),
-        # y = alt.Y('week:O'),
-        text=alt.Text("date(CRASH DATE):O", format="%d"),
-        opacity=alt.condition(
-            (selection_weekday & selection_month),
-            alt.value(1),
-            alt.value(0.2),
-        ),
-    )
-    month_bar = (
-        alt.Chart(accident_data)
-        .mark_bar()
-        .transform_filter(
-            selection_cond
-            & selection_buro
-            & selection_vehicle
-            & selection_time
-            & selection_acc_map
-        )
-        .encode(
-            x=alt.X(
-                "count()", scale=alt.Scale(reverse=False), axis=alt.Axis(title=None)
-            ),
-            y=alt.Y("month:O", title=None),
-            opacity=alt.condition(selection_month, alt.value(1), alt.value(0.2)),
-        )
-        .properties(width=int(w / 3), height=h)
-    )
+    # base = (
+    #     alt.Chart(accident_data)
+    #     .mark_rect()
+    #     .transform_filter(
+    #         selection_cond
+    #         & selection_buro
+    #         & selection_vehicle
+    #         & time_brush
+    #         & selection_acc_map
+    #         & selection_acc_factor
+    #     )
+    #     .encode(
+    #         x=alt.X("dayname:O", sort=order),
+    #         y=alt.Y("week:O", title=None, axis=alt.Axis(labels=False)),
+    #         row=alt.Row("monthname:O", sort=month_order, spacing=0),
+    #     )
+    #     .properties(width=int(w), height=int(h / 3))
+    # )
+
+    # calendars = (
+    #     alt.Chart(accident_data)
+    #     .transform_filter(
+    #         selection_cond
+    #         & selection_buro
+    #         & selection_vehicle
+    #         & time_brush
+    #         & selection_acc_map
+    #         & selection_acc_factor
+    #     )
+    #     .mark_rect(stroke="grey")
+    #     .transform_filter(
+    #         selection_cond
+    #         & selection_buro
+    #         & selection_vehicle
+    #         & time_brush
+    #         & selection_acc_map
+    #         & selection_acc_factor
+    #     )
+    #     .encode(
+    #         # x = alt.X('weekday'),
+    #         # y = alt.Y('week:O'),
+    #         color=alt.Color(
+    #             "count()",
+    #             scale=alt.Scale(scheme="lightmulti"),
+    #         ),
+    #         opacity=alt.condition(
+    #             (selection_month & selection_weekday),
+    #             alt.value(1),
+    #             alt.value(0.2),
+    #         ),
+    #         tooltip=["datetime:T"],
+    #         x=alt.X("dayname:O", sort=order),
+    #         y=alt.Y("week:O", title=None, axis=alt.Axis(labels=False)),
+    #         row=alt.Row("monthname:O", sort=month_order, spacing=0),
+    #     )
+    #     .properties(width=int(w), height=int(h / 3))
+    #     .add_params(selection_weekday)
+    # )
+
+    # numbers = base.mark_text(baseline="middle").encode(
+    #     # x = alt.X('weekday'),
+    #     # y = alt.Y('week:O'),
+    #     text=alt.Text("date(CRASH DATE):O", format="%d"),
+    #     opacity=alt.condition(
+    #         (selection_weekday & selection_month),
+    #         alt.value(1),
+    #         alt.value(0.2),
+    #     ),
+    # )
+    # month_bar = (
+    #     alt.Chart(accident_data)
+    #     .mark_bar()
+    #     .transform_filter(
+    #         selection_cond
+    #         & selection_buro
+    #         & selection_vehicle
+    #         & time_brush
+    #         & selection_acc_map
+    #     )
+    #     .encode(
+    #         x=alt.X(
+    #             "count()", scale=alt.Scale(reverse=False), axis=alt.Axis(title=None)
+    #         ),
+    #         y=alt.Y("month:O", title=None),
+    #         opacity=alt.condition(selection_month, alt.value(1), alt.value(0.2)),
+    #     )
+    #     .properties(width=int(w / 3), height=h)
+    # )
     # weekday_bar = (
     #     alt.Chart(accident_data)
     #     .mark_bar()
@@ -523,7 +639,7 @@ def get_calendar_chart(
     #         selection_cond
     #         & selection_buro
     #         & selection_vehicle
-    #         & selection_time
+    #         & time_brush
     #         & selection_acc_map
     #     )
     #     .encode(
@@ -534,10 +650,8 @@ def get_calendar_chart(
     #     .properties(width=w, height=int(h * (ratio) / 3))
     #     .add_params(selection_weekday)
     # )
+
     return calendars
-    return (calendars.facet("monthname:O",spacing=0)).add_params(
-        selection_weekday, selection_month
-    )
 
 
 def get_time_of_day_chart(
@@ -548,19 +662,29 @@ def get_time_of_day_chart(
     selection_month,
     selection_weekday,
     selection_vehicle,
-    selection_time,
+    time_brush,
+    selection_acc_factor,
     w=600,
     h=300,
 ):
-    day_order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    df = df[filter_cols]
+    h1 = int(2 * h / 3)
+    h2 = int(1 * h / 3)
+    w1 = int(3 * w / 4)
+    w2 = int(w / 4)
     # select only columns HOUR, weekday
     # df = df[["HOUR", "weekday"]]
     base = (
-        alt.Chart(df)
+        alt.Chart()
         .mark_rect()
-        .encode(x=alt.X("HOUR:O"), y=alt.Y("dayname:O", sort=day_order, title = None))
+        .encode(x=alt.X("HOUR:O"), y=alt.Y("dayname:O"))
         .transform_filter(
-            selection_cond & selection_buro & selection_vehicle & selection_acc_map
+            selection_cond
+            & selection_buro
+            & selection_vehicle
+            & selection_acc_map
+            & selection_acc_factor
+            & selection_month
         )
     )
 
@@ -571,11 +695,13 @@ def get_time_of_day_chart(
             # y = alt.Y('week:O'),
             color=alt.Color(
                 "count()",
-                scale=alt.Scale(scheme="lightmulti"),
+                scale=alt.Scale(scheme="tealblues"),
             ),
             opacity=alt.condition(
-                selection_time & selection_weekday, alt.value(1), alt.value(0.2)
+                time_brush & selection_weekday, alt.value(1), alt.value(0.2)
             ),
+            tooltip=["count()"],
+            # legend=alt.Legend(title="Number of accidents",layout = ''),
             # opacity=alt.condition(
             #     (selection_month & selection_weekday),
             #     alt.value(1),
@@ -583,40 +709,247 @@ def get_time_of_day_chart(
             # ),
             # opacity = alt.condition(selection_day_aux,alt.value(1),alt.value(0.2))
         )
-        .properties(width=w, height=int(h / 3))
-        .add_params(selection_time, selection_weekday)
+        .properties(width=w1, height=h1)
+        .add_params(time_brush, selection_weekday)
     )
 
     hour_bar = (
-        alt.Chart(df)
+        alt.Chart()
         .mark_bar()
         .transform_filter(
-            selection_cond & selection_buro & selection_vehicle & selection_acc_map
+            selection_cond
+            & selection_buro
+            & selection_vehicle
+            & selection_acc_map
+            & selection_acc_factor
+            & selection_month
         )
         .encode(
-            y=alt.Y(
-                "count()", scale=alt.Scale(reverse=False), axis=alt.Axis(title=None)
-            ),
-            x=alt.X("HOUR:O"),
-            opacity=alt.condition(selection_time, alt.value(1), alt.value(0.2)),
+            y=alt.Y("count()", scale=alt.Scale(reverse=False)),
+            x=alt.X("HOUR:O", axis=None),
+            opacity=alt.condition(time_brush, alt.value(1), alt.value(0.2)),
+            tooltip=["count()"],
         )
-        .properties(width=int(w), height=int(h / 3))
-        .add_params(selection_time)
+        .properties(width=int(w1), height=h2)
+        .add_params(time_brush)
         # .add_params(selection_month)
     )
     weekday_bar = (
+        alt.Chart()
+        .mark_bar()
+        .transform_filter(
+            selection_cond
+            & selection_buro
+            & selection_vehicle
+            & selection_acc_map
+            & selection_acc_factor
+            & selection_month
+        )
+        .encode(
+            x=alt.X("count()"),
+            y=alt.Y("dayname:O", axis=None),
+            opacity=alt.condition(selection_weekday, alt.value(1), alt.value(0.2)),
+            tooltip=["count()"],
+        )
+        .properties(width=w2, height=h1)
+        .add_params(selection_weekday)
+    )
+    # time_chart = (
+    #     hour_bar & (times_of_day | weekday_bar).resolve_scale(y="shared")
+    # ).resolve_scale(x="shared", color="shared")
+    time_chart = alt.vconcat(
+        hour_bar,
+        alt.hconcat(times_of_day, weekday_bar).resolve_scale(y="shared"),
+        data=df,
+    ).resolve_scale(color="shared", x="shared")
+    return time_chart
+
+
+def get_factor_chart(
+    df,
+    selection_buro,
+    selection_acc_map,
+    selection_cond,
+    selection_month,
+    selection_weekday,
+    selection_vehicle,
+    time_brush,
+    selection_acc_factor,
+    w=600,
+    h=300,
+):
+    df = df[filter_cols]
+    return (
         alt.Chart(df)
         .mark_bar()
         .transform_filter(
-            selection_cond & selection_buro & selection_vehicle & selection_acc_map
+            selection_buro
+            & selection_acc_map
+            & selection_cond
+            & selection_month
+            & selection_weekday
+            & selection_vehicle
+            & time_brush
         )
         .encode(
-            x=alt.X("count()", axis=alt.Axis(title=None)),
-            y=alt.Y("dayname:O", sort=day_order, title = None),
-            opacity=alt.condition(selection_weekday, alt.value(1), alt.value(0.2)),
+            x=alt.X(
+                "CONTRIBUTING FACTOR VEHICLE 1:N",
+                axis=alt.Axis(title="Contributing Factor"),
+            ),
+            y=alt.Y("count():Q", axis=alt.Axis(title="Count")),
+            opacity=alt.condition(selection_acc_factor, alt.value(1), alt.value(0.2)),
         )
-        .properties(width=int(w / 3), height=int(h / 3))
-        .add_params(selection_weekday)
+        # .transform_aggregate(count="count()", groupby=["CONTRIBUTING FACTOR VEHICLE 1"])
+        # .transform_window(
+        #     window=[{"op": "rank", "as": "rank"}],
+        #     sort=[{"field": "count", "order": "descending"}],
+        # )
+        # .transform_filter("datum.rank <= 10")
+        .add_params(selection_acc_factor)
+        .properties(title="Top 10 Contributing Factors")
     )
-    time_chart = hour_bar & (times_of_day | weekday_bar)
-    return time_chart
+
+
+def make_visualization(accident_data):
+    colors = {"bg": "#eff0f3", "col1": "#d8b365", "col2": "#5ab4ac"}
+    w = 600
+    h = 400
+    ratio = 0.2
+
+    selection_cond = alt.selection_point(on="click", fields=["conditions"])
+    selection_acc_map = alt.selection_interval()
+    selection_buro = alt.selection_point(fields=["name"])
+    selection_vehicle = alt.selection_point(on="click", fields=["VEHICLE TYPE CODE 1"])
+    time_brush = alt.selection_point(fields=["HOUR"])
+
+    selection_weekday = alt.selection_point(fields=["dayname"])
+
+    month_dropdown = alt.binding_select(
+        options=[
+            "June, July, August, September",
+            "June",
+            "July",
+            "August",
+            "September",
+        ],
+        name="month",
+        labels=["All", "June", "July", "August", "September"],
+    )
+    selection_month = alt.selection_point(fields=["monthname"])
+    selection_acc_factor = alt.selection_point(fields=["CONTRIBUTING FACTOR VEHICLE 1"])
+
+    cols = [
+        "CRASH DATE",
+        "LATITUDE",
+        "LONGITUDE",
+        "date",
+        "HOUR",
+        "week",
+        "weekday",
+        "month",
+        "name",
+        "VEHICLE TYPE CODE 1",
+        "CONTRIBUTING FACTOR VEHICLE 1",
+        "dayname",
+        "monthname",
+        "conditions",
+    ]
+
+    accident_data = accident_data[cols]
+
+    w = 1000
+    geo_view, bur_chart = get_map_chart(
+        accident_data,
+        selection_cond,
+        selection_buro,
+        selection_acc_map,
+        selection_month,
+        selection_weekday,
+        selection_vehicle,
+        time_brush,
+        selection_acc_factor,
+        h1=600,
+        h2=350,
+        w=w,
+        ratio=0.7,
+    )
+    weather = get_weather_chart(
+        accident_data,
+        selection_buro,
+        selection_acc_map,
+        selection_cond,
+        selection_month,
+        selection_weekday,
+        selection_vehicle,
+        time_brush,
+        selection_acc_factor,
+        h=399,
+        w=w * 0.8,
+        ratio=0.8,
+    )
+    calendar = get_calendar_chart(
+        accident_data,
+        selection_buro,
+        selection_acc_map,
+        selection_cond,
+        selection_month,
+        selection_weekday,
+        selection_vehicle,
+        time_brush,
+        selection_acc_factor,
+        h=399,
+        w=w * 0.3,
+    )
+    vehicles = get_vehicle_chart(
+        accident_data,
+        selection_buro,
+        selection_acc_map,
+        selection_cond,
+        selection_month,
+        selection_weekday,
+        selection_vehicle,
+        time_brush,
+        selection_acc_factor,
+        h=200,
+        w=w * 0.3,
+    )
+    time_of_day = get_time_of_day_chart(
+        accident_data,
+        selection_buro,
+        selection_acc_map,
+        selection_cond,
+        selection_month,
+        selection_weekday,
+        selection_vehicle,
+        time_brush,
+        selection_acc_factor,
+        h=399,
+    )
+    acc_factor = get_factor_chart(
+        accident_data,
+        selection_buro,
+        selection_acc_map,
+        selection_cond,
+        selection_month,
+        selection_weekday,
+        selection_vehicle,
+        time_brush,
+        selection_acc_factor,
+        h=399,
+        w=w * 0.3,
+    )
+    # .configure_scale(
+    #     bandPaddingInner=.1).add_params(date_selector,month_selection, weekday_selection)
+
+    chart = (
+        (geo_view | (bur_chart & vehicles))
+        & (weather | acc_factor).resolve_scale(color="independent")
+        & (calendar | time_of_day).resolve_scale(color="independent")
+    )
+    # chart = (
+    #     (geo_view | (bur_chart & vehicles))
+    #     & (weather | acc_factor)
+    #     & (calendar.add_params(selection_month) | time_of_day)
+    # )
+
+    return chart
