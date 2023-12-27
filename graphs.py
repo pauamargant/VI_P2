@@ -477,7 +477,7 @@ def get_calendar_chart(
         )
         .mark_rect()
         .encode(
-            row=alt.Row("monthname:O", sort=month_order, spacing=0, title=None),
+            row=alt.Row("monthname:O", sort=month_order, spacing=0, title=None, axis = alt.Axis(labels=False)),
             x=alt.X("dayname:O", sort=order, axis=alt.Axis(title=None)),
             y=alt.Y("week:O", title=None, axis=alt.Axis(labels=False)),
             color=alt.Color(
@@ -486,7 +486,7 @@ def get_calendar_chart(
                 legend=alt.Legend(title="No. accidents"),
             ),
             opacity=alt.condition(
-                selection_month & selection_weekday,
+                selection_weekday,
                 alt.value(1),
                 alt.value(0.2),
             ),
@@ -511,8 +511,9 @@ def get_calendar_chart(
             & selection_acc_factor
         )
         .encode(
-            y = alt.Y("monthname:O", sort=month_order, title=None),
+            y = alt.Y("monthname:O", sort=month_order, title=None,axis = alt.Axis(labels=False, ticks=False)),
             color = alt.Color("monthname:N", legend=None),
+            opacity=alt.condition(selection_month, alt.value(1), alt.value(0.2)),
         )
         .properties(width=int(w/4), height=int(h))
         .add_params(selection_month)
@@ -626,7 +627,7 @@ def get_calendar_chart(
     #     .add_params(selection_weekday)
     # )
 
-    return (calendars | month_bar).resolve_scale(color="shared").add_params(selection_month)
+    return (month_bar|calendars ).add_params(selection_month)
 
 
 def get_time_of_day_chart(
