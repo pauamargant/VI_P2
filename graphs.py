@@ -456,7 +456,7 @@ def get_weather_chart(
         alt.Chart(accident_data)
         .mark_rect()
         .encode(
-            y=alt.Y("conditions:N", sort=alt.EncodingSortField(field="diff")),
+            y=alt.Y("conditions:N"),
             color="count()",
             opacity=alt.condition(selection_cond, alt.value(1), alt.value(0.2)),
         )
