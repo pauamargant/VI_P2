@@ -186,7 +186,7 @@ def get_map_chart(
         .encode(
             opacity=alt.condition(selection_buro, alt.value(0.6), alt.value(0.2)),
             color=alt.Color("name:N"),
-            tooltip=["name:N"],
+            tooltip=[alt.Tooltip("name:N", title="Borough")],
         )
         .properties(width=w * ratio, height=h1)
     )
@@ -231,13 +231,13 @@ def get_map_chart(
             & selection_acc_factor
         )
         .encode(
-            x=alt.X("count()"),
-            y=alt.Y("name:N").sort("-x"),
+            x=alt.X("count()", axis=alt.Axis(title=None)),
+            y=alt.Y("name:N", axis=alt.Axis(title='Boroughs')).sort("-x"),
             opacity=alt.condition(selection_buro, alt.value(1), alt.value(0.4)),
             color=alt.Color("name:N", legend=None),
-            tooltip=["name:N", "count()"],
+            tooltip=[alt.Tooltip("count()", title="No. accidents"), alt.Tooltip("name:N", title="Borough")],
         )
-        .properties(width=w * (1 - ratio), height=h2)
+        .properties(width=w * (1 - ratio), height=h2, title = 'Accidents by Borough')
     )
     return (base + points).add_params(selection_buro), bar_chart.add_params(
         selection_buro
@@ -338,7 +338,7 @@ def get_vehicle_chart(
 
 def get_weather_data(
     df,
-    fname="weather.csv",
+    fname="weather2018.csv",
 ):
     """
     Retrieves weather data for a given DataFrame of accidents.
@@ -457,11 +457,12 @@ def get_weather_chart(
         alt.Chart(accident_data)
         .mark_rect()
         .encode(
-            y=alt.Y("conditions:N", sort= custom_sort),
-            color="count()",
+            y=alt.Y("conditions:N", sort= custom_sort, axis=alt.Axis(title=None)),
+            color=alt.Color("count()", legend=alt.Legend(title="No. accidents"), scale=alt.Scale(scheme="blues")),
             opacity=alt.condition(selection_cond, alt.value(1), alt.value(0.2)),
+            tooltip=[alt.Tooltip("count()", title="No. accidents"), alt.Tooltip("conditions:N", title="Weather")],
         )
-        .properties(width=w * (1 - ratio), height=h)
+        .properties(width=w * (1 - ratio), height=h, title="Weather conditions")
         .add_params(selection_cond)
     )
     return bar_legend
@@ -482,7 +483,7 @@ def get_calendar_chart(
     h=300,
     ratio=0.8,
 ):
-    accident_data = accident_data[filter_cols + ["week"]]
+    accident_data = accident_data[filter_cols + ["week"] + ["date"]]
 
     order = [
         "Monday",
@@ -493,7 +494,7 @@ def get_calendar_chart(
         "Saturday",
         "Sunday",
     ]
-    month_order = ["June", "July", "August"]
+    month_order = ["June", "July", "August", "September"]
     # select only needed columns
     # accident_data = accident_data[["date", "weekday", "month", "week","CRASH DATE"]]
     # base = (
@@ -514,6 +515,7 @@ def get_calendar_chart(
     #     )
     #     .properties(width=int(w), height=int(h / 3))
     # )
+    accident_data["fulldate"] = accident_data['monthname'] + ' ' + accident_data['date'].dt.day.astype(str) + ', ' + accident_data['dayname']
 
     calendars = (
         alt.Chart(accident_data)
@@ -527,23 +529,25 @@ def get_calendar_chart(
         )
         .mark_rect()
         .encode(
-            row=alt.Row("monthname:O", sort=month_order, spacing=0),
-            x=alt.X("dayname:O", sort=order),
+            row=alt.Row("monthname:O", sort=month_order, spacing=0, title=None),
+            x=alt.X("dayname:O", sort=order, axis=alt.Axis(title=None)),
             y=alt.Y("week:O", title=None, axis=alt.Axis(labels=False)),
             color=alt.Color(
                 "count()",
                 scale=alt.Scale(scheme="lightmulti"),
+                legend=alt.Legend(title="No. accidents"),
             ),
-            opacity=alt.condition(
-                (selection_month & selection_weekday),
+            opacity=alt.condition(selection_month & selection_weekday,
                 alt.value(1),
                 alt.value(0.2),
             ),
-            tooltip=["datetime:T", "count()", "monthname"],
+            tooltip=[alt.Tooltip("fulldate:N", title="Date"), alt.Tooltip("count()", title="No. accidents")],
         )
         .add_params(selection_weekday, selection_month)
-        .properties(width=int(w), height=int(h / 3))
-    )  # .interactive()
+        .properties(width=int(w), height=int(h / 4))
+    )
+
+    
 
     # base = (
     #     alt.Chart(accident_data)
@@ -705,7 +709,7 @@ def get_time_of_day_chart(
             opacity=alt.condition(
                 time_brush & selection_weekday, alt.value(1), alt.value(0.2)
             ),
-            tooltip=["count()"],
+            tooltip=[alt.Tooltip("count()", title="No. accidents"), alt.Tooltip("HOUR:O", title="Hour"), alt.Tooltip("dayname:O", title="Day")],
             # legend=alt.Legend(title="Number of accidents",layout = ''),
             # opacity=alt.condition(
             #     (selection_month & selection_weekday),
@@ -733,7 +737,7 @@ def get_time_of_day_chart(
             y=alt.Y("count()", scale=alt.Scale(reverse=False), axis=alt.Axis(title="No. accidents")),
             x=alt.X("HOUR:O", axis=None),
             opacity=alt.condition(time_brush, alt.value(1), alt.value(0.2)),
-            tooltip=["count()"],
+            tooltip=[alt.Tooltip("count()", title="No. accidents"), alt.Tooltip("HOUR:O", title="Hour")],
         )
         .properties(width=int(w1), height=h2)
         .add_params(time_brush)
@@ -754,7 +758,7 @@ def get_time_of_day_chart(
             x=alt.X("count()", axis=alt.Axis(title="No. accidents")),
             y=alt.Y("dayname:O", axis=None, sort = custom_sort),
             opacity=alt.condition(selection_weekday, alt.value(1), alt.value(0.2)),
-            tooltip=["count()"],
+            tooltip=[alt.Tooltip("count()", title="No. accidents"), alt.Tooltip("dayname:O", title="Day")],
         )
         .properties(width=w2, height=h1)
         .add_params(selection_weekday)
@@ -803,8 +807,8 @@ def get_factor_chart(
             ).sort("-x"),
             
             x=alt.X("counter:Q", axis=alt.Axis(title="No. accidents")),
-            
             opacity=alt.condition(selection_acc_factor, alt.value(1), alt.value(0.2)),
+            tooltip=[alt.Tooltip("counter:Q", title="No. accidents"), alt.Tooltip("CONTRIBUTING FACTOR VEHICLE 1:N", title="Factor")],
         )
         .transform_aggregate(counter="count()", groupby=["CONTRIBUTING FACTOR VEHICLE 1"])
         .transform_window(

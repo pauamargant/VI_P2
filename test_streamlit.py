@@ -2,7 +2,7 @@ from graphs import *
 import altair as alt
 import streamlit as st
 
-st.set_page_config(layout="wide", page_title="NYC Traffic Accidents")
+st.set_page_config(layout="centered", page_title="NYC Traffic Accidents")
 
 
 # @st.cache_data
