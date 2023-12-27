@@ -34,6 +34,7 @@ filter_cols = [
     "HOUR",
     "dayname",
     "CONTRIBUTING FACTOR VEHICLE 1",
+    "conditions",
 ]
 
 
@@ -361,6 +362,8 @@ def get_weather_data(
 
     # We Merge weather conditions with accidents using pd.concat
     data = df.merge(weather_cond, left_on="date", right_on="datetime", how="inner")
+    print(data.columns)
+    # rename conditions_x to conditions
     return data
 
 
@@ -537,7 +540,7 @@ def get_calendar_chart(
             ),
             tooltip=["datetime:T", "count()", "monthname"],
         )
-        .add_params(selection_weekday)
+        .add_params(selection_weekday, selection_month)
         .properties(width=int(w), height=int(h / 3))
     )  # .interactive()
 
@@ -754,7 +757,11 @@ def get_time_of_day_chart(
     # time_chart = (
     #     hour_bar & (times_of_day | weekday_bar).resolve_scale(y="shared")
     # ).resolve_scale(x="shared", color="shared")
-    time_chart = alt.vconcat(hour_bar, alt.hconcat(times_of_day, weekday_bar).resolve_scale(y="shared"), data=df).resolve_scale(color="shared",x="shared")
+    time_chart = alt.vconcat(
+        hour_bar,
+        alt.hconcat(times_of_day, weekday_bar).resolve_scale(y="shared"),
+        data=df,
+    ).resolve_scale(color="shared", x="shared")
     return time_chart
 
 
@@ -841,11 +848,11 @@ def make_visualization(accident_data):
         "weekday",
         "month",
         "name",
-        "conditions",
         "VEHICLE TYPE CODE 1",
         "CONTRIBUTING FACTOR VEHICLE 1",
         "dayname",
         "monthname",
+        "conditions",
     ]
 
     accident_data = accident_data[cols]
@@ -937,8 +944,8 @@ def make_visualization(accident_data):
     chart = (
         (geo_view | (bur_chart & vehicles))
         & (weather | acc_factor).resolve_scale(color="independent")
-        & (calendar.add_params(selection_month) | time_of_day).resolve_scale(color="independent")
-    ).configure_scale(bandPaddingInner=0)
+        & (calendar | time_of_day).resolve_scale(color="independent")
+    )
     # chart = (
     #     (geo_view | (bur_chart & vehicles))
     #     & (weather | acc_factor)
