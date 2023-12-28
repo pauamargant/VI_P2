@@ -819,7 +819,7 @@ def get_month_chart(
             tooltip=[
                 alt.Tooltip("monthname:N", title="Month"),
                 alt.Tooltip("count()", title="No. accidents"),
-                alt.Tooltip("mean_accidents:Q", title="Mean accidents"),
+                alt.Tooltip("mean_accidents:Q", format = ",.2f"   ,title="Mean accidents"),
             ],
         )
         .properties(width=int(h / 4), height=int(h))
