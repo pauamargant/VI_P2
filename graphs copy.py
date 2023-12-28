@@ -41,7 +41,6 @@ filter_cols = [
     "date",
     "fulldate",
     "INJURED",
-    "num_days_in_month",
 ]
 
 
@@ -139,8 +138,7 @@ def get_accident_data(fname, sample=False):
 
     df["dayname"] = df["date"].dt.day_name()
     df["monthname"] = df["date"].dt.month_name()
-    df['num_days_in_month'] = df['monthname'].apply(lambda x: 30 if x in ["June", "September"] else 31)
-    
+
     df["fulldate"] = (
         df["monthname"] + " " + df["date"].dt.day.astype(str) + ", " + df["dayname"]
     )
@@ -238,7 +236,7 @@ def get_map_chart(
         .encode(
             longitude="LONGITUDE:Q",
             latitude="LATITUDE:Q",
-            size=alt.value(2),
+            size=alt.value(3),
             # color=alt.Color("name:N", legend=None),
             opacity=alt.condition(
                 selection_buro & selection_acc_map, alt.value(1), alt.value(0)
@@ -791,12 +789,6 @@ def get_month_chart(
             & time_brush
             & selection_injured
             & selection_acc_factor
-        ).transform_window(
-            total_acc='count()',
-            frame=[None, None],
-            groupby=['monthname'],
-        ).transform_calculate(
-            mean_accidents= alt.datum.total_acc / alt.datum.num_days_in_month,
         )
         .encode(
             y=alt.Y(
@@ -805,11 +797,14 @@ def get_month_chart(
                 title=None,
                 axis=alt.Axis(labels=False, ticks=False),
             ),
-            color=alt.Color("mean_accidents:Q", legend=None, scale=alt.Scale(scheme="lightmulti")),
+            color=alt.Color(
+                "monthname:N", legend=None, scale=alt.Scale(scheme="lightmulti")
+            ),
             opacity=alt.condition(selection_month, alt.value(1), alt.value(0.2)),
-            tooltip=[alt.Tooltip("monthname:N", title="Month"), 
-                    alt.Tooltip("count()", title="No. accidents"), 
-                    alt.Tooltip("mean_accidents:Q", title="Mean accidents")],
+            tooltip=[
+                alt.Tooltip("monthname:N", title="Month"),
+                alt.Tooltip("count()", title="No. accidents"),
+            ],
         )
         .properties(width=int(h / 4), height=int(h))
         .add_params(selection_month)
