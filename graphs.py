@@ -1,20 +1,15 @@
 import altair as alt
 import pandas as pd
-
-#!pip install geopandas
 import geopandas as gpd
-
-#!pip install geoplot
-
-#!pip install geodatasets
-
 from geodatasets import get_path
 import numpy as np
 
 # we disable max_rows in altair
 alt.data_transformers.disable_max_rows()
 
+# We define the color style palette
 colors = {"bg": "#eff0f3", "col1": "#4f8c9d", "col2": "#6ceac0", "col3": "#c3dee6"}
+# Sequential palette
 seq = [
     "#4f8c9d",
     "#5f9aa9",
@@ -27,6 +22,9 @@ seq = [
     "#d2ffff",
 ]
 
+
+# Columns which must be in all datasets for all charts, because of the
+# interactivity
 filter_cols = [
     "name",
     "monthname",
@@ -47,10 +45,10 @@ filter_cols = [
 
 def get_map():
     """
-    Retrieves a hexagonal map of New York City.
+    Retrieves a map of New York City.
 
     Returns:
-        GeoDataFrame: A hexagonal map of New York City.
+        GeoDataFrame: A map of New York City, with buroughs divisions.
     """
     path = get_path("nybb")
     ny = gpd.read_file(path).to_crs("EPSG:4326")
@@ -59,21 +57,14 @@ def get_map():
 
 def get_buroughs():
     """
-    Get the boroughs from a hex map.
-
-    Parameters:
-    - hex_map: The hex map to extract boroughs from.
+    Get the boroughs from ny map.
 
     Returns:
-    - hex_buroughs: Dissolved hex map by borough name.
+    - buroughs: Buroughs geodataframe.
     """
     path = get_path("nybb")
     buroughs = gpd.read_file(path).to_crs("EPSG:4326")
 
-    # ny_df = pd.DataFrame()
-    # ny_df["x"] = buroughs.centroid.x
-    # ny_df["y"] = buroughs.centroid.y
-    # ny_df["BoroName"] = buroughs.index
     return buroughs.reset_index()
 
 
@@ -98,12 +89,6 @@ def get_accident_data(fname, sample=False):
     df = df[df["date"].dt.month.isin([6, 7, 8, 9])]
     if sample:
         df = df.sample(1000)
-    # Create a column for weekday/weekend
-    """df["weekday"] = df["date"].dt.dayofweek
-    df["weekday"] = df["weekday"].replace(
-        [0, 1, 2, 3, 4, 5, 6],
-        ["weekday", "weekday", "weekday", "weekday", "weekday", "weekend", "weekend"],
-    )"""
 
     df["VEHICLE TYPE CODE 1"] = df["VEHICLE TYPE CODE 1"].str.title()
 
@@ -126,14 +111,13 @@ def get_accident_data(fname, sample=False):
     # make weekend column
     df["weekend"] = df["weekday"].apply(lambda x: 1 if x > 4 else 0)
 
-    # make column with week number
     df["week"] = df["date"].dt.isocalendar().week
-    # month column
     df["month"] = df["date"].dt.month
 
-    # # for each month get the minimum week number
+    # for each month we get the minimum week number, to get the
+    # week number within the month
     min_week = df.groupby(["month"])["week"].min().reset_index()
-    # # merge with accident data
+
     df = pd.merge(df, min_week, on="month", how="left")
     df["week"] = df["week_x"] - df["week_y"] + 1
 
@@ -153,10 +137,13 @@ def get_accident_data(fname, sample=False):
         + df["NUMBER OF MOTORIST INJURED"]
         + df["NUMBER OF PERSONS INJURED"]
     )
-    # 0 if = 0 and 1 if >0
+    # We assign 0 if = 0 and 1 if >0
     df["INJURED"] = df["INJURED"].apply(
         lambda x: "with injuries" if x > 0 else "without injuries"
     )
+
+    # Given that a lot of null values are present in burough, we
+    # use the coordinates to get the burough
 
     burough_map = get_buroughs()
     df = df.dropna(subset=["LATITUDE", "LONGITUDE"])
@@ -166,11 +153,8 @@ def get_accident_data(fname, sample=False):
     gdf = gpd.sjoin(gdf, burough_map, how="right", op="intersects")
     # convert to dataframe
     gdf = pd.DataFrame(gdf)
-
-    # create properties.name column equal to BoroName
-    # gdf["properties.name"] = gdf["BoroName"]
-    # rename BoroName to name
     gdf = gdf.rename(columns={"BoroName": "name"})
+
     # make column month_number- week_number
     gdf["month-week"] = gdf["month"].astype(str) + "-" + gdf["week"].astype(str)
 
@@ -178,6 +162,33 @@ def get_accident_data(fname, sample=False):
     gdf = gdf.drop(columns=["geometry"])
 
     return gdf
+
+
+def get_weather_data(
+    df,
+    fname="weather2018.csv",
+):
+    """
+    Retrieves weather data for a given DataFrame of accidents.
+
+    Args:
+        df (pandas.DataFrame): DataFrame containing accident data.
+        fnames (list, optional): List of file names for weather data CSV files. Defaults to ["new york city 2018-06-01 to 2018-08-31.csv", "new york city 2020-06-01 to 2020-08-31"].
+
+    Returns:
+        pandas.DataFrame: DataFrame containing merged accident and weather data.
+    """
+    df_weather = pd.read_csv(fname)
+
+    weather_cond = df_weather[["datetime", "conditions"]].copy()
+    weather_cond["datetime"] = pd.to_datetime(
+        weather_cond["datetime"], format="%Y-%m-%d"
+    )
+
+    df["date"] = pd.to_datetime(pd.to_datetime(df["CRASH DATE"]).dt.date)
+
+    data = df.merge(weather_cond, left_on="date", right_on="datetime", how="inner")
+    return data
 
 
 def get_map_chart(
@@ -196,14 +207,28 @@ def get_map_chart(
     h2=200,
     ratio=0.8,
 ):
+    """
+    Creates an interactive map of New York City, showing the number of accidents per burough
+    in a bar chart
+
+    Parameters:
+        -accident_data (DataFrame): The input DataFrame containing the data for the chart.
+        - (Selectors for interactivity) ....
+        - w (int): The width of the chart
+        - h1 (int): the height of the map chart
+        - h2 (int): the height of the bar chart
+        - ratio (float): the ratio between the map chart and the bar chart in width
+
+    """
     ny = "https://raw.githubusercontent.com/pauamargant/VI_P1/main/resources/new-york-city-boroughs.geojson"
     data_geojson_remote = alt.Data(
         url=ny, format=alt.DataFormat(property="features", type="json")
     )
 
+    # We create the base map
     base = (
         alt.Chart(data_geojson_remote)
-        .mark_geoshape(fill="lightgrey")  # fill=colors["col3"]
+        .mark_geoshape(fill="lightgrey")
         .properties(
             width=500,
             height=300,
@@ -211,20 +236,14 @@ def get_map_chart(
         .project(type="albersUsa")
         .encode(
             opacity=alt.condition(selection_buro, alt.value(0.6), alt.value(0.2)),
-            # color=alt.Color("name:N").scale(
-            #     # scheme="category20c"
-            #     range=["#66c2a5", "#fc8d62", "#8da0cb", "#e78ac3", "#a6d854"]
-            # ),
             tooltip=[alt.Tooltip("name:N", title="Borough")],
         )
         .properties(width=w * ratio, height=h1)
     )
-    # .transform_lookup(
-    #     lookup="name",
-    #     from_=alt.LookupData(accident_data, "BoroName"),
-    # )
-    # .add_params(selection_buro)
+
     accident_data = accident_data[filter_cols]
+
+    # We create the points corresponding to the accidents
     points = (
         alt.Chart(accident_data)
         .transform_filter(
@@ -252,6 +271,7 @@ def get_map_chart(
         .add_params(selection_acc_map)
     )
 
+    # We create the bar chart of the number of accidents per burough
     bar_chart = (
         alt.Chart(accident_data)
         .mark_bar()
@@ -277,14 +297,11 @@ def get_map_chart(
         )
         .properties(width=w * (1 - ratio), height=h2, title="Accidents by Borough")
     )
+
+    # We create the layered chart and return a tuple with the map and the bar chart
     return (base + points).add_params(selection_buro), bar_chart.add_params(
         selection_buro
     )
-    # return (
-    #     ((base + points) | bar_chart)
-    #     .resolve_scale(color="shared")
-    #     .add_params(selection_buro)
-    # )
 
 
 def get_vehicle_chart(
@@ -306,8 +323,9 @@ def get_vehicle_chart(
 
     Parameters:
     - df: DataFrame - The input DataFrame containing the data for the chart.
-    - width: int - The width of the chart (default: 500).
-    - height: int - The height of the chart (default: 300).
+    - (Selectors for interactivity)
+    - w: int - The width of the chart (default: 500).
+    - w: int - The height of the chart (default: 300).
 
     Returns:
     - layered_chart: LayeredChart - The layered bar chart visualizing the data.
@@ -331,12 +349,7 @@ def get_vehicle_chart(
                 "VEHICLE TYPE CODE 1:N",
                 title=None,
             ).sort("x"),
-            x=alt.X(
-                "count()",
-                title="Number of accidents"
-                # scale=alt.Scale(domain=(0, 50)),
-            ),
-            # color=alt.Color("VEHICLE TYPE CODE 1:N", legend=None),
+            x=alt.X("count()", title="Number of accidents"),
             tooltip=[
                 alt.Tooltip("VEHICLE TYPE CODE 1:N", title="Type of vehicle"),
                 alt.Tooltip("count()", title="No. accidents"),
@@ -353,17 +366,16 @@ def get_vehicle_chart(
         fontSize=12,
         dx=3,  # Adjust the horizontal position of the labels
     ).encode(
-        text=alt.Text("count()"),  # Format the percentage with one decimal place
-        color=alt.value("black"),  # Set the text color to black for other categories,
+        text=alt.Text("count()"),
+        color=alt.value("black"),
     )
 
-    # add emojis to the end of the bar
     text_emoji = (
         bar_chart.mark_text(
             align="left",
             baseline="middle",
             fontSize=30,
-            dx=0,  # Adjust the horizontal position of the labels
+            dx=0,
         )
         .encode(text=alt.Text("emoji:N"))
         .transform_calculate(
@@ -371,43 +383,7 @@ def get_vehicle_chart(
         )
     )
 
-    """layered_chart = (
-        alt.layer(bar_chart, text_labels)
-        .configure_axisX(grid=True)
-        .properties(width=width, height=height)
-    )"""
     return bar_chart + text_emoji
-
-
-def get_weather_data(
-    df,
-    fname="weather2018.csv",
-):
-    """
-    Retrieves weather data for a given DataFrame of accidents.
-
-    Args:
-        df (pandas.DataFrame): DataFrame containing accident data.
-        fnames (list, optional): List of file names for weather data CSV files. Defaults to ["new york city 2018-06-01 to 2018-08-31.csv", "new york city 2020-06-01 to 2020-08-31"].
-
-    Returns:
-        pandas.DataFrame: DataFrame containing merged accident and weather data.
-    """
-    df_weather = pd.read_csv(fname)
-
-    weather_cond = df_weather[["datetime", "conditions"]].copy()
-    weather_cond["datetime"] = pd.to_datetime(
-        weather_cond["datetime"], format="%Y-%m-%d"
-    )
-
-    # We  Convert 'date' column in df to the same timezone as 'datetime' column in weather_cond
-    df["date"] = pd.to_datetime(pd.to_datetime(df["CRASH DATE"]).dt.date)
-
-    # We Merge weather conditions with accidents using pd.concat
-    data = df.merge(weather_cond, left_on="date", right_on="datetime", how="inner")
-    print(data.columns)
-    # rename conditions_x to conditions
-    return data
 
 
 def get_weather_chart(
@@ -425,6 +401,18 @@ def get_weather_chart(
     h=300,
     ratio=0.8,
 ):
+    """
+    Creates a layered bar chart showing the count of accidents per weather type.
+
+    Parameters:
+    - df: DataFrame - The input DataFrame containing the data for the chart.
+    - (Selectors for interactivity)
+    - w: int - The width of the chart (default: 500).
+    - w: int - The height of the chart (default: 300).
+
+    Returns:
+    - layered_chart: LayeredChart - The layered bar chart visualizing the data.
+    """
     custom_sort = [
         "Clear",
         "Partially cloudy",
@@ -464,7 +452,6 @@ def get_weather_chart(
         .add_params(selection_cond)
     )
     return bar_legend
-    # return (bars + ts) | bar_legend
 
 
 def get_calendar_chart(
@@ -482,6 +469,18 @@ def get_calendar_chart(
     h=300,
     ratio=0.8,
 ):
+    """
+    Creates a layered bar chart showing the accident count in a calendar like chart.
+
+    Parameters:
+    - df: DataFrame - The input DataFrame containing the data for the chart.
+    - (Selectors for interactivity)
+    - w: int - The width of the chart (default: 500).
+    - w: int - The height of the chart (default: 300).
+
+    Returns:
+    - layered_chart: LayeredChart - The layered bar chart visualizing the data.
+    """
     accident_data = accident_data[filter_cols]
 
     order = [
@@ -501,7 +500,6 @@ def get_calendar_chart(
             selection_acc_map
             & selection_cond
             & selection_month
-            # & selection_weekday
             & selection_vehicle
             & time_brush
             & selection_injured
@@ -531,120 +529,7 @@ def get_calendar_chart(
         .properties(width=int(w), height=int(h / 4))
     )
 
-    # base = (
-    #     alt.Chart(accident_data)
-    #     .mark_rect()
-    #     .transform_filter(
-    #         selection_cond
-    #         & selection_buro
-    #         & selection_vehicle
-    #         & time_brush & selection_injured
-
-    #         & selection_acc_map
-    #         & selection_acc_factor
-    #     )
-    #     .encode(
-    #         x=alt.X("dayname:O", sort=order),
-    #         y=alt.Y("week:O", title=None, axis=alt.Axis(labels=False)),
-    #         row=alt.Row("monthname:O", sort=month_order, spacing=0),
-    #     )
-    #     .properties(width=int(w), height=int(h / 3))
-    # )
-
-    # calendars = (
-    #     alt.Chart(accident_data)
-    #     .transform_filter(
-    #         selection_cond
-    #         & selection_buro
-    #         & selection_vehicle
-    #         & time_brush & selection_injured
-
-    #         & selection_acc_map
-    #         & selection_acc_factor
-    #     )
-    #     .mark_rect(stroke="grey")
-    #     .transform_filter(
-    #         selection_cond
-    #         & selection_buro
-    #         & selection_vehicle
-    #         & time_brush & selection_injured
-
-    #         & selection_acc_map
-    #         & selection_acc_factor
-    #     )
-    #     .encode(
-    #         # x = alt.X('weekday'),
-    #         # y = alt.Y('week:O'),
-    #         color=alt.Color(
-    #             "count()",
-    #             scale=alt.Scale(scheme="lightmulti"),
-    #         ),
-    #         opacity=alt.condition(
-    #             (selection_month & selection_weekday),
-    #             alt.value(1),
-    #             alt.value(0.2),
-    #         ),
-    #         tooltip=["datetime:T"],
-    #         x=alt.X("dayname:O", sort=order),
-    #         y=alt.Y("week:O", title=None, axis=alt.Axis(labels=False)),
-    #         row=alt.Row("monthname:O", sort=month_order, spacing=0),
-    #     )
-    #     .properties(width=int(w), height=int(h / 3))
-    #     .add_params(selection_weekday)
-    # )
-
-    # numbers = base.mark_text(baseline="middle").encode(
-    #     # x = alt.X('weekday'),
-    #     # y = alt.Y('week:O'),
-    #     text=alt.Text("date(CRASH DATE):O", format="%d"),
-    #     opacity=alt.condition(
-    #         (selection_weekday & selection_month),
-    #         alt.value(1),
-    #         alt.value(0.2),
-    #     ),
-    # )
-    # month_bar = (
-    #     alt.Chart(accident_data)
-    #     .mark_bar()
-    #     .transform_filter(
-    #         selection_cond
-    #         & selection_buro
-    #         & selection_vehicle
-    #         & time_brush & selection_injured
-
-    #         & selection_acc_map
-    #     )
-    #     .encode(
-    #         x=alt.X(
-    #             "count()", scale=alt.Scale(reverse=False), axis=alt.Axis(title=None)
-    #         ),
-    #         y=alt.Y("month:O", title=None),
-    #         opacity=alt.condition(selection_month, alt.value(1), alt.value(0.2)),
-    #     )
-    #     .properties(width=int(w / 3), height=h)
-    # )
-    # weekday_bar = (
-    #     alt.Chart(accident_data)
-    #     .mark_bar()
-    #     .transform_filter(
-    #         selection_cond
-    #         & selection_buro
-    #         & selection_vehicle
-    #         & time_brush & selection_injured
-
-    #         & selection_acc_map
-    #     )
-    #     .encode(
-    #         y=alt.Y("count()", axis=alt.Axis(title=None)),
-    #         x=alt.X("weekday:O"),
-    #         opacity=alt.condition(selection_weekday, alt.value(1), alt.value(0.2)),
-    #     )
-    #     .properties(width=w, height=int(h * (ratio) / 3))
-    #     .add_params(selection_weekday)
-    # )
-
     return calendars
-    # .add_params(selection_month)
 
 
 def get_counts_chart(
@@ -662,24 +547,26 @@ def get_counts_chart(
     h=70,
     ratio=0.8,
 ):
+    """
+    Creates a layered bar chart showing the total accident count, the currenlty selected count
+    and the count of accidents with and without injuries.
+
+    Parameters:
+    - df: DataFrame - The input DataFrame containing the data for the chart.
+    - (Selectors for interactivity)
+    - w: int - The width of the chart (default: 500).
+    - w: int - The height of the chart (default: 300).
+
+    Returns:
+    - layered_chart: LayeredChart - The layered bar chart visualizing the data.
+    """
     accident_data = accident_data[filter_cols]
 
     total_chart = (
         alt.Chart(accident_data)
         .mark_bar(cornerRadius=10)
         .encode(
-            # y=alt.Y(
-            #     "monthname:N",
-            #     sort=month_order,
-            #     title=None,
-            #     axis=alt.Axis(labels=False, ticks=False),
-            # ),
-            # color=alt.Color(
-            #     ":N", legend=None, scale=alt.Scale(scheme="lightmulti")
-            # ),
-            # opacity=alt.condition(selection_month, alt.value(1), alt.value(0.2)),
             tooltip=[
-                # alt.Tooltip("monthname:N", title="Month"),
                 alt.Tooltip("count()", title="No. accidents"),
             ],
         )
@@ -740,7 +627,6 @@ def get_counts_chart(
         .encode(
             opacity=alt.condition(selection_injured, alt.value(1), alt.value(0.2)),
             tooltip=[
-                # alt.Tooltip("monthname:N", title="Month"),
                 alt.Tooltip("count()", title="No. accidents"),
             ],
             y=alt.Y("INJURED:N", title=None, axis=alt.Axis(ticks=False)),
@@ -780,6 +666,18 @@ def get_month_chart(
     h=300,
     ratio=0.8,
 ):
+    """
+    Creates a layered bar chart showing the total accident count per month.
+
+    Parameters:
+    - df: DataFrame - The input DataFrame containing the data for the chart.
+    - (Selectors for interactivity)
+    - w: int - The width of the chart (default: 500).
+    - w: int - The height of the chart (default: 300).
+
+    Returns:
+    - layered_chart: LayeredChart - The layered bar chart visualizing the data."""
+
     accident_data = accident_data[filter_cols]
 
     month_order = ["June", "July", "August", "September"]
@@ -819,7 +717,7 @@ def get_month_chart(
             tooltip=[
                 alt.Tooltip("monthname:N", title="Month"),
                 alt.Tooltip("count()", title="No. accidents"),
-                alt.Tooltip("mean_accidents:Q", format = ",.2f"   ,title="Mean accidents"),
+                alt.Tooltip("mean_accidents:Q", format=",.2f", title="Mean accidents"),
             ],
         )
         .properties(width=int(h / 4), height=int(h))
@@ -854,6 +752,19 @@ def get_time_of_day_chart(
     w=600,
     h=300,
 ):
+    """
+    Creates a layered bar chart showing the accidents per time of day and weekday. It includes a bar chart for the time of day
+    and weekday axis.
+
+    Parameters:
+    - df: DataFrame - The input DataFrame containing the data for the chart.
+    - (Selectors for interactivity)
+    - w: int - The width of the chart (default: 500).
+    - w: int - The height of the chart (default: 300).
+
+    Returns:
+    - layered_chart: LayeredChart - The layered bar chart visualizing the data.
+    """
     df = df[filter_cols]
     h1 = int(2 * h / 3)
     h2 = int(1 * h / 3)
@@ -869,7 +780,6 @@ def get_time_of_day_chart(
         "Saturday",
         "Sunday",
     ]
-
 
     base = (
         alt.Chart()
@@ -937,7 +847,6 @@ def get_time_of_day_chart(
         )
         .properties(width=int(w1), height=h2)
         .add_params(time_brush)
-        # .add_params(selection_month)
     )
     weekday_bar = (
         alt.Chart()
@@ -963,9 +872,7 @@ def get_time_of_day_chart(
         .properties(width=w2, height=h1)
         .add_params(selection_weekday)
     )
-    # time_chart = (
-    #     hour_bar & (times_of_day | weekday_bar).resolve_scale(y="shared")
-    # ).resolve_scale(x="shared", color="shared")
+
     time_chart = alt.vconcat(
         hour_bar,
         alt.hconcat(times_of_day, weekday_bar).resolve_scale(y="shared"),
@@ -988,6 +895,19 @@ def get_factor_chart(
     w=600,
     h=300,
 ):
+    """
+    Makes a bar chart showing the number of accidents per contributing factor. It shows the top 10.
+
+    Parameters:
+    - df: DataFrame - The input DataFrame containing the data for the chart.
+    - (Selectors for interactivity)
+    - w: int - The width of the chart (default: 600).
+    - w: int - The height of the chart (default: 300).
+
+    Returns:
+    - bar_chart: LayeredChart - The layered bar chart visualizing the data.
+
+    """
     df = df[filter_cols]
     return (
         alt.Chart(df)
@@ -1021,19 +941,21 @@ def get_factor_chart(
             rank="rank(counter)", sort=[alt.SortField("counter", order="descending")]
         )
         .transform_filter((alt.datum.rank <= 10))
-        # .transform_aggregate(count="count()", groupby=["CONTRIBUTING FACTOR VEHICLE 1"])
-        # .transform_window(
-        #     window=[{"op": "rank", "as": "rank"}],
-        #     sort=[{"field": "count", "order": "descending"}],
-        # )
-        # .transform_filter("datum.rank <= 10")
         .add_params(selection_acc_factor)
         .properties(title="Top 10 Contributing Factors")
     )
 
 
-def make_visualization(accident_data, disable_interv=False):
-    colors = {"bg": "#eff0f3", "col1": "#d8b365", "col2": "#5ab4ac"}
+def make_visualization(accident_data):
+    """
+    It creates the whole visualization, with all the charts and interactivity.
+
+    Parameters:
+    - accident_data: DataFrame - The input DataFrame containing the data for the chart.
+
+    Returns:
+    - chart: LayeredChart - The layered chart visualizing the data.
+    """
     w = 600
     h = 400
     ratio = 0.2
@@ -1199,9 +1121,6 @@ def make_visualization(accident_data, disable_interv=False):
         h=70,
         w=100,
     )
-    # .configure_scale(
-    #     bandPaddingInner=.1).add_params(date_selector,month_selection, weekday_selection)
-
     chart = (
         (geo_view | (bur_chart & vehicles) | counts)
         & (weather | acc_factor).resolve_scale(color="independent")
@@ -1209,10 +1128,5 @@ def make_visualization(accident_data, disable_interv=False):
             (months | calendar).resolve_scale(color="shared") | time_of_day
         ).resolve_scale(color="independent")
     )
-    # chart = (
-    #     (geo_view | (bur_chart & vehicles))
-    #     & (weather | acc_factor)
-    #     & (calendar.add_params(selection_month) | time_of_day)
-    # )
 
     return chart
