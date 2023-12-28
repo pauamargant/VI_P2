@@ -870,8 +870,7 @@ def get_time_of_day_chart(
         "Sunday",
     ]
 
-    # select only columns HOUR, weekday
-    # df = df[["HOUR", "weekday"]]
+
     base = (
         alt.Chart()
         .mark_rect()
@@ -893,8 +892,6 @@ def get_time_of_day_chart(
     times_of_day = (
         base.mark_rect(stroke="grey")
         .encode(
-            # x = alt.X('weekday'),
-            # y = alt.Y('week:O'),
             color=alt.Color(
                 "count()",
                 scale=alt.Scale(scheme="tealblues"),
@@ -908,16 +905,9 @@ def get_time_of_day_chart(
                 alt.Tooltip("HOUR:O", title="Hour"),
                 alt.Tooltip("dayname:O", title="Day"),
             ],
-            # legend=alt.Legend(title="Number of accidents",layout = ''),
-            # opacity=alt.condition(
-            #     (selection_month & selection_weekday),
-            #     alt.value(1),
-            #     alt.value(0.2),
-            # ),
-            # opacity = alt.condition(selection_day_aux,alt.value(1),alt.value(0.2))
         )
         .properties(width=w1, height=h1)
-        .add_params(time_brush, selection_injured, selection_weekday)
+        .add_params(time_brush, selection_weekday)
     )
 
     hour_bar = (
