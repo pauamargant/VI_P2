@@ -139,8 +139,10 @@ def get_accident_data(fname, sample=False):
 
     df["dayname"] = df["date"].dt.day_name()
     df["monthname"] = df["date"].dt.month_name()
-    df['num_days_in_month'] = df['monthname'].apply(lambda x: 30 if x in ["June", "September"] else 31)
-    
+    df["num_days_in_month"] = df["monthname"].apply(
+        lambda x: 30 if x in ["June", "September"] else 31
+    )
+
     df["fulldate"] = (
         df["monthname"] + " " + df["date"].dt.day.astype(str) + ", " + df["dayname"]
     )
@@ -201,7 +203,7 @@ def get_map_chart(
 
     base = (
         alt.Chart(data_geojson_remote)
-        .mark_geoshape()  # fill=colors["col3"]
+        .mark_geoshape(fill="lightgrey")  # fill=colors["col3"]
         .properties(
             width=500,
             height=300,
@@ -209,10 +211,10 @@ def get_map_chart(
         .project(type="albersUsa")
         .encode(
             opacity=alt.condition(selection_buro, alt.value(0.6), alt.value(0.2)),
-            color=alt.Color("name:N").scale(
-                # scheme="category20c"
-                range=["#66c2a5", "#fc8d62", "#8da0cb", "#e78ac3", "#a6d854"]
-            ),
+            # color=alt.Color("name:N").scale(
+            #     # scheme="category20c"
+            #     range=["#66c2a5", "#fc8d62", "#8da0cb", "#e78ac3", "#a6d854"]
+            # ),
             tooltip=[alt.Tooltip("name:N", title="Borough")],
         )
         .properties(width=w * ratio, height=h1)
@@ -234,12 +236,15 @@ def get_map_chart(
             & selection_injured
             & selection_acc_factor
         )
-        .mark_circle(color="#545454")
+        .mark_circle()
         .encode(
             longitude="LONGITUDE:Q",
             latitude="LATITUDE:Q",
             size=alt.value(2),
-            # color=alt.Color("name:N", legend=None),
+            color=alt.Color("name:N").scale(
+                # scheme="category20c"
+                range=["#66c2a5", "#fc8d62", "#8da0cb", "#e78ac3", "#a6d854"]
+            ),
             opacity=alt.condition(
                 selection_buro & selection_acc_map, alt.value(1), alt.value(0)
             ),
@@ -791,12 +796,14 @@ def get_month_chart(
             & time_brush
             & selection_injured
             & selection_acc_factor
-        ).transform_window(
-            total_acc='count()',
+        )
+        .transform_window(
+            total_acc="count()",
             frame=[None, None],
-            groupby=['monthname'],
-        ).transform_calculate(
-            mean_accidents= alt.datum.total_acc / alt.datum.num_days_in_month,
+            groupby=["monthname"],
+        )
+        .transform_calculate(
+            mean_accidents=alt.datum.total_acc / alt.datum.num_days_in_month,
         )
         .encode(
             y=alt.Y(
@@ -805,11 +812,15 @@ def get_month_chart(
                 title=None,
                 axis=alt.Axis(labels=False, ticks=False),
             ),
-            color=alt.Color("mean_accidents:Q", legend=None, scale=alt.Scale(scheme="lightmulti")),
+            color=alt.Color(
+                "mean_accidents:Q", legend=None, scale=alt.Scale(scheme="greens")
+            ),
             opacity=alt.condition(selection_month, alt.value(1), alt.value(0.2)),
-            tooltip=[alt.Tooltip("monthname:N", title="Month"), 
-                    alt.Tooltip("count()", title="No. accidents"), 
-                    alt.Tooltip("mean_accidents:Q", title="Mean accidents")],
+            tooltip=[
+                alt.Tooltip("monthname:N", title="Month"),
+                alt.Tooltip("count()", title="No. accidents"),
+                alt.Tooltip("mean_accidents:Q", title="Mean accidents"),
+            ],
         )
         .properties(width=int(h / 4), height=int(h))
         .add_params(selection_month)
@@ -1077,6 +1088,7 @@ def make_visualization(accident_data, disable_interv=False):
         "conditions",
         "fulldate",
         "INJURED",
+        "num_days_in_month",
     ]
 
     accident_data = accident_data[cols]
@@ -1203,7 +1215,9 @@ def make_visualization(accident_data, disable_interv=False):
     chart = (
         (geo_view | (bur_chart & vehicles) | counts)
         & (weather | acc_factor).resolve_scale(color="independent")
-        & (months | calendar | time_of_day).resolve_scale(color="independent")
+        & (
+            (months | calendar).resolve_scale(color="shared") | time_of_day
+        ).resolve_scale(color="independent")
     )
     # chart = (
     #     (geo_view | (bur_chart & vehicles))
