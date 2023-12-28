@@ -47,9 +47,6 @@ In order to run the visualization, the following command must be executed in the
 streamlit run DavidG_PauA_streamlit_site.py
 ```
 
-
-
-
 ### Troubleshooting
 In case there are issues related to the installation of the libraries, we recommend trying the alternative installation method. If the issue persists, please contact us.
 
