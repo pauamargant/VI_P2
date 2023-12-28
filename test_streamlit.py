@@ -44,7 +44,6 @@ def get_graph(data):
 # vis = get_graph(data)
 data = get_accident_data(fname="dataset_v1.csv")
 accident_data = get_weather_data(data)
-print(accident_data.columns)
 vis = make_visualization(accident_data)
 st.title("NYC Traffic Accidents")
 

@@ -888,7 +888,6 @@ def make_visualization(accident_data):
     )
     selection_month = alt.selection_point(fields=["monthname"])
     selection_acc_factor = alt.selection_point(fields=["CONTRIBUTING FACTOR VEHICLE 1"])
-    selection_month = alt.selection_point(fields=["monthname"])
     
     cols = [
         "CRASH DATE",
