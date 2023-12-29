@@ -22,6 +22,8 @@ In order to ensure the code run properly we recommend using a dedicated*conda* e
 - pandas
 - geopandas
 - geodatasets
+
+### Setting up the environment
 In order to set up the required environment we recommend creating a new environment using the following instructions. We provide two different ways to create the environment, using the provided *environment.yml* file or manually installing the required libraries. 
 
 - Creating the conda environment manually and installing the required libraries (_faster_). Note that `<env_name>` must be replaced with the desired name for the environment.
@@ -48,4 +50,5 @@ streamlit run DavidG_PauA_streamlit_site.py
 ```
 
 ### Troubleshooting
-In case there are issues related to the installation of the libraries, we recommend trying the alternative installation method. If the issue persists, a prebuilt version of the visualization is also provided in `html` format. This version, which is available in the `char.html` file can be opened in any browser and does not require any additional setup.
+In case there are issues related to the installation of the libraries, we recommend trying the alternative installation method. If the issue persists, a prebuilt version of the visualization is also provided in `html` format. This version, which is available in the `chart.html` file can be opened in any browser and does not require any additional setup.
+
