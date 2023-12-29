@@ -13,7 +13,7 @@ def get_data():
     return accident_data
 
 
-#@st.cache_data
+# @st.cache_data
 def get_graph(data):
     vis = make_visualization(data)
     return vis
@@ -21,13 +21,19 @@ def get_graph(data):
 
 # make sidebar with instructions
 with st.sidebar:
+    st.write(
+        """This app allows you to explore the relationship between weather and traffic accidents in NYC.
+            Throughout the visualization you can click on specific items in  order to select them, which will update the rest of the visualization to show only the data that matches your selection.
+            """
+    )
+    st.write(
+        "_Important_: We strongly suggest using light mode. You can clicking on the dots in the top right corner of the page to change the theme."
+    )
     if st.button("Clear Selection"):
         st.write("Clearing selection")
     with st.expander("How to use"):
         st.write(
-            """This app allows you to explore the relationship between weather and traffic accidents in NYC.
-            Throughout the visualization you can click on specific items in  order to select them, which will update the rest of the visualization to show only the data that matches your selection.
-            You can also hover over the data to see more information about it.
+            """You can also hover over the data to see more information about it.
             At the bottom of the graph, dropwdown menus are also included to further filter the data.
 
             """

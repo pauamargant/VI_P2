@@ -116,53 +116,54 @@ def get_accident_data(fname, sample=False):
 
     # for each month we get the minimum week number, to get the
     # week number within the month
-    #min_week = df.groupby(["month"])["week"].min().reset_index()
+    # min_week = df.groupby(["month"])["week"].min().reset_index()
 
-    #df = pd.merge(df, min_week, on="month", how="left")
-    #df["week"] = df["week_x"] - df["week_y"] + 1
+    # df = pd.merge(df, min_week, on="month", how="left")
+    # df["week"] = df["week_x"] - df["week_y"] + 1
 
     replacement_dict = {
-    'Passing Too Closely': 'Traffic Violation - Passing Too Closely',
-    'Driver Inattention/Distraction': 'Driver Distraction',
-    'Unspecified': 'Unclear Reason',
-    'Following Too Closely': 'Tailgating',
-    'Turning Improperly': 'Improper Turning',
-    'Unsafe Lane Changing': 'Unsafe Lane Change',
-    'Pedestrian/Bicyclist/Other Pedestrian Error/Confusion': 'Pedestrian/Bicyclist Error/Confusion',
-    'Driver Inexperience': 'Inexperienced Driver',
-    'Reaction to Uninvolved Vehicle': 'Reaction to Other Vehicle',
-    'Aggressive Driving/Road Rage': 'Aggressive Driving/Road Rage',
-    'Passing or Lane Usage Improper': 'Improper Passing/Lane Usage',
-    'Other Vehicular': 'Other Vehicle Related',
-    'Traffic Control Disregarded': 'Disregarded Traffic Control',
-    'Failure to Yield Right-of-Way': 'Failure to Yield',
-    'Unsafe Speed': 'Excessive Speed',
-    'Fell Asleep': 'Drowsy Driving',
-    'Passenger Distraction': 'Passenger Distraction',
-    'Oversized Vehicle': 'Oversized Vehicle',
-    'Backing Unsafely': 'Unsafe Backing',
-    'Failure to Keep Right': 'Failure to Keep Right',
-    'Outside Car Distraction': 'External Distraction',
-    'Tire Failure/Inadequate': 'Tire Failure/Inadequate',
-    'View Obstructed/Limited': 'Limited Visibility',
-    'Glare': 'Glare Effect',
-    'Alcohol Involvement': 'Alcohol Impairment',
-    'Obstruction/Debris': 'Road Obstruction/Debris',
-    'Pavement Slippery': 'Slippery Pavement',
-    'Brakes Defective': 'Defective Brakes',
-    'Cell Phone (hand-Held)': 'Cell Phone Usage',
-    'Drugs (illegal)': 'Illegal Drug Usage',
-    'Driverless/Runaway Vehicle': 'Runaway Vehicle',
-    'Steering Failure': 'Steering Failure',
-    'Accelerator Defective': 'Defective Accelerator',
-    'Pavement Defective': 'Defective Pavement',
-    'Fatigued/Drowsy': 'Driver Fatigue',
-    'Other Lighting Defects': 'Lighting Defects',
-    'Vehicle Vandalism': 'Malicious Damage'
-}
+        "Passing Too Closely": "Traffic Violation - Passing Too Closely",
+        "Driver Inattention/Distraction": "Driver Distraction",
+        "Unspecified": "Unclear Reason",
+        "Following Too Closely": "Tailgating",
+        "Turning Improperly": "Improper Turning",
+        "Unsafe Lane Changing": "Unsafe Lane Change",
+        "Pedestrian/Bicyclist/Other Pedestrian Error/Confusion": "Pedestrian/Bicyclist Error/Confusion",
+        "Driver Inexperience": "Inexperienced Driver",
+        "Reaction to Uninvolved Vehicle": "Reaction to Other Vehicle",
+        "Aggressive Driving/Road Rage": "Aggressive Driving/Road Rage",
+        "Passing or Lane Usage Improper": "Improper Passing/Lane Usage",
+        "Other Vehicular": "Other Vehicle Related",
+        "Traffic Control Disregarded": "Disregarded Traffic Control",
+        "Failure to Yield Right-of-Way": "Failure to Yield",
+        "Unsafe Speed": "Excessive Speed",
+        "Fell Asleep": "Drowsy Driving",
+        "Passenger Distraction": "Passenger Distraction",
+        "Oversized Vehicle": "Oversized Vehicle",
+        "Backing Unsafely": "Unsafe Backing",
+        "Failure to Keep Right": "Failure to Keep Right",
+        "Outside Car Distraction": "External Distraction",
+        "Tire Failure/Inadequate": "Tire Failure/Inadequate",
+        "View Obstructed/Limited": "Limited Visibility",
+        "Glare": "Glare Effect",
+        "Alcohol Involvement": "Alcohol Impairment",
+        "Obstruction/Debris": "Road Obstruction/Debris",
+        "Pavement Slippery": "Slippery Pavement",
+        "Brakes Defective": "Defective Brakes",
+        "Cell Phone (hand-Held)": "Cell Phone Usage",
+        "Drugs (illegal)": "Illegal Drug Usage",
+        "Driverless/Runaway Vehicle": "Runaway Vehicle",
+        "Steering Failure": "Steering Failure",
+        "Accelerator Defective": "Defective Accelerator",
+        "Pavement Defective": "Defective Pavement",
+        "Fatigued/Drowsy": "Driver Fatigue",
+        "Other Lighting Defects": "Lighting Defects",
+        "Vehicle Vandalism": "Malicious Damage",
+    }
 
-    df['CONTRIBUTING FACTOR VEHICLE 1'] = df['CONTRIBUTING FACTOR VEHICLE 1'].replace(replacement_dict)
-
+    df["CONTRIBUTING FACTOR VEHICLE 1"] = df["CONTRIBUTING FACTOR VEHICLE 1"].replace(
+        replacement_dict
+    )
 
     df["dayname"] = df["date"].dt.day_name()
     df["monthname"] = df["date"].dt.month_name()
@@ -245,6 +246,7 @@ def get_map_chart(
     time_brush,
     selection_injured,
     selection_acc_factor,
+    selection_week,
     w=400,
     h1=400,
     h2=200,
@@ -271,7 +273,7 @@ def get_map_chart(
     # We create the base map
     base = (
         alt.Chart(data_geojson_remote)
-        .mark_geoshape(fill="lightgrey", stroke = "white")
+        .mark_geoshape(fill="lightgrey", stroke="white")
         .properties(
             width=500,
             height=300,
@@ -297,6 +299,7 @@ def get_map_chart(
             & time_brush
             & selection_injured
             & selection_acc_factor
+            & selection_week
         )
         .mark_circle()
         .encode(
@@ -331,6 +334,7 @@ def get_map_chart(
             & selection_injured
             & selection_acc_map
             & selection_acc_factor
+            & selection_week
         )
         .encode(
             x=alt.X("count()", axis=alt.Axis(title=None)),
@@ -364,6 +368,7 @@ def get_vehicle_chart(
     time_brush,
     selection_injured,
     selection_acc_factor,
+    selection_week,
     w=500,
     h=300,
 ):
@@ -391,6 +396,7 @@ def get_vehicle_chart(
             & selection_injured
             & selection_acc_map
             & selection_acc_factor
+            & selection_week
         )
         .mark_bar()
         .encode(
@@ -446,6 +452,7 @@ def get_weather_chart(
     time_brush,
     selection_injured,
     selection_acc_factor,
+    selection_week,
     w=500,
     h=300,
     ratio=0.8,
@@ -482,6 +489,7 @@ def get_weather_chart(
             & selection_injured
             & selection_acc_factor
             & selection_buro
+            & selection_week
         )
         .mark_rect()
         .encode(
@@ -514,6 +522,7 @@ def get_calendar_chart(
     time_brush,
     selection_injured,
     selection_acc_factor,
+    selection_week,
     w=500,
     h=300,
     ratio=0.8,
@@ -566,7 +575,7 @@ def get_calendar_chart(
                 legend=alt.Legend(title="No. accidents", orient="top"),
             ),
             opacity=alt.condition(
-                selection_weekday,
+                selection_weekday & selection_week,
                 alt.value(1),
                 alt.value(0.2),
             ),
@@ -575,7 +584,9 @@ def get_calendar_chart(
                 alt.Tooltip("count()", title="No. accidents"),
             ],
         )
-        .properties(width=int(w), height=int(h / 4)).resolve_scale(y="independent")
+        .properties(width=int(w), height=int(h / 4))
+        .resolve_scale(y="independent")
+        .add_params(selection_week)
     )
 
     return calendars
@@ -592,6 +603,7 @@ def get_counts_chart(
     time_brush,
     selection_injured,
     selection_acc_factor,
+    selection_week,
     w=100,
     h=70,
     ratio=0.8,
@@ -647,6 +659,7 @@ def get_counts_chart(
             & time_brush
             & selection_acc_factor
             & selection_injured
+            & selection_week
         )
         .mark_text(
             align="center",
@@ -674,14 +687,19 @@ def get_counts_chart(
             & selection_vehicle
             & time_brush
             & selection_acc_factor
+            & selection_week
         )
         .encode(
             opacity=alt.condition(selection_injured, alt.value(1), alt.value(0.2)),
             tooltip=[
                 alt.Tooltip("count()", title="No. accidents"),
             ],
-            #color=alt.value("blue"),
-            x=alt.X("INJURED:N", title=None, axis=alt.Axis(ticks=False, labelAngle=0, orient="top")),
+            # color=alt.value("blue"),
+            x=alt.X(
+                "INJURED:N",
+                title=None,
+                axis=alt.Axis(ticks=False, labelAngle=0, orient="top"),
+            ),
         )
     )
     injured_text = (
@@ -696,7 +714,7 @@ def get_counts_chart(
             text=alt.Text("count()"),
             color=alt.value("white"),
         )
-        .properties(width=int(w*1.8), height=int(h * 0.8))
+        .properties(width=int(w * 1.8), height=int(h * 0.8))
     )
 
     injured_chart = (injured_chart + injured_text).add_params(selection_injured)
@@ -714,6 +732,7 @@ def get_month_chart(
     time_brush,
     selection_injured,
     selection_acc_factor,
+    selection_week,
     w=500,
     h=300,
     ratio=0.8,
@@ -741,7 +760,7 @@ def get_month_chart(
             selection_acc_map
             & selection_cond
             # & selection_month
-            # & selection_weekday
+            & selection_weekday
             & selection_vehicle
             & time_brush
             & selection_injured
@@ -762,10 +781,10 @@ def get_month_chart(
                 title=None,
                 axis=alt.Axis(labels=False, ticks=False),
             ),
-            color=alt.Color(
-                "mean_accidents:Q", scale=alt.Scale(scheme="greens")
+            color=alt.Color("mean_accidents:Q", scale=alt.Scale(scheme="greens")),
+            opacity=alt.condition(
+                selection_month, alt.value(1), alt.value(0.2)
             ),
-            opacity=alt.condition(selection_month, alt.value(1), alt.value(0.2)),
             tooltip=[
                 alt.Tooltip("monthname:N", title="Month"),
                 alt.Tooltip("count()", title="No. accidents"),
@@ -801,6 +820,7 @@ def get_time_of_day_chart(
     time_brush,
     selection_injured,
     selection_acc_factor,
+    selection_week,
     w=600,
     h=300,
 ):
@@ -848,6 +868,7 @@ def get_time_of_day_chart(
             & selection_acc_factor
             & selection_month
             & selection_injured
+            & selection_week
         )
     )
 
@@ -882,6 +903,7 @@ def get_time_of_day_chart(
             & selection_acc_map
             & selection_acc_factor
             & selection_month
+            & selection_week
             & selection_injured
         )
         .encode(
@@ -911,6 +933,7 @@ def get_time_of_day_chart(
             & selection_acc_factor
             & selection_month
             & selection_injured
+            & selection_week
         )
         .encode(
             x=alt.X("count()", axis=alt.Axis(title="No. accidents")),
@@ -944,6 +967,7 @@ def get_factor_chart(
     time_brush,
     selection_injured,
     selection_acc_factor,
+    selection_week,
     w=600,
     h=300,
 ):
@@ -973,13 +997,22 @@ def get_factor_chart(
             & selection_vehicle
             & time_brush
             & selection_injured
+            & selection_week
         )
         .encode(
             y=alt.Y(
                 "CONTRIBUTING FACTOR VEHICLE 1:N",
                 axis=alt.Axis(title=None, orient="right"),
             ).sort("-x"),
-            x=alt.X("counter:Q", axis=alt.Axis(title="No. accidents per Contributing Factor", orient="bottom", labelLimit=2000), scale=alt.Scale(reverse=True)),
+            x=alt.X(
+                "counter:Q",
+                axis=alt.Axis(
+                    title="No. accidents per Contributing Factor",
+                    orient="bottom",
+                    labelLimit=2000,
+                ),
+                scale=alt.Scale(reverse=True),
+            ),
             opacity=alt.condition(selection_acc_factor, alt.value(1), alt.value(0.2)),
             tooltip=[
                 alt.Tooltip("counter:Q", title="No. accidents"),
@@ -994,7 +1027,7 @@ def get_factor_chart(
         )
         .transform_filter((alt.datum.rank <= 10))
         .add_params(selection_acc_factor)
-        #.properties(title="Top 10 Contributing Factors")
+        # .properties(title="Top 10 Contributing Factors")
     )
 
 
@@ -1018,7 +1051,7 @@ def make_visualization(accident_data):
     selection_vehicle = alt.selection_point(on="click", fields=["VEHICLE TYPE CODE 1"])
     time_brush = alt.selection_point(fields=["HOUR"])
     selection_injured = alt.selection_point(fields=["INJURED"])
-
+    selection_week = alt.selection_point(fields=["week"])
     selection_weekday = alt.selection_point(fields=["dayname"])
 
     month_dropdown = alt.binding_select(
@@ -1068,6 +1101,7 @@ def make_visualization(accident_data):
         time_brush,
         selection_injured,
         selection_acc_factor,
+        selection_week,
         h1=600,
         h2=200,
         w=w,
@@ -1084,6 +1118,7 @@ def make_visualization(accident_data):
         time_brush,
         selection_injured,
         selection_acc_factor,
+        selection_week,
         h=399,
         w=w * 0.8,
         ratio=0.8,
@@ -1099,6 +1134,7 @@ def make_visualization(accident_data):
         time_brush,
         selection_injured,
         selection_acc_factor,
+        selection_week,
         h=550,
         w=w * 0.3,
     )
@@ -1113,6 +1149,7 @@ def make_visualization(accident_data):
         time_brush,
         selection_injured,
         selection_acc_factor,
+        selection_week,
         h=550,
         w=w * 0.3,
     )
@@ -1127,6 +1164,7 @@ def make_visualization(accident_data):
         time_brush,
         selection_injured,
         selection_acc_factor,
+        selection_week,
         h=200,
         w=w * 0.3,
     )
@@ -1141,8 +1179,9 @@ def make_visualization(accident_data):
         time_brush,
         selection_injured,
         selection_acc_factor,
+        selection_week,
         h=250,
-        w = 600,
+        w=600,
     )
     acc_factor = get_factor_chart(
         accident_data,
@@ -1155,8 +1194,9 @@ def make_visualization(accident_data):
         time_brush,
         selection_injured,
         selection_acc_factor,
-        h = 200,
-        w = 2000,
+        selection_week,
+        h=200,
+        w=2000,
     )
 
     counts = get_counts_chart(
@@ -1170,12 +1210,13 @@ def make_visualization(accident_data):
         time_brush,
         selection_injured,
         selection_acc_factor,
+        selection_week,
         h=70,
         w=100,
     )
-    chart = ( 
-        (geo_view | (counts & ((bur_chart & vehicles) | weather)))
-        & ((months | calendar).resolve_scale(color="shared") | ((time_of_day & acc_factor).resolve_scale(color="independent")))    
+    chart = (geo_view | (counts & ((bur_chart & vehicles) | weather))) & (
+        (months | calendar).resolve_scale(color="shared")
+        | ((time_of_day & acc_factor).resolve_scale(color="independent"))
     )
 
     return chart
