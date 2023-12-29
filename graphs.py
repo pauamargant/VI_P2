@@ -116,10 +116,10 @@ def get_accident_data(fname, sample=False):
 
     # for each month we get the minimum week number, to get the
     # week number within the month
-    min_week = df.groupby(["month"])["week"].min().reset_index()
+    #min_week = df.groupby(["month"])["week"].min().reset_index()
 
-    df = pd.merge(df, min_week, on="month", how="left")
-    df["week"] = df["week_x"] - df["week_y"] + 1
+    #df = pd.merge(df, min_week, on="month", how="left")
+    #df["week"] = df["week_x"] - df["week_y"] + 1
 
     df["dayname"] = df["date"].dt.day_name()
     df["monthname"] = df["date"].dt.month_name()
@@ -295,7 +295,7 @@ def get_map_chart(
                 alt.Tooltip("name:N", title="Borough"),
             ],
         )
-        .properties(width=w * (1 - ratio), height=h2, title="Accidents by Borough")
+        .properties(width=w * 0.3, height=h2, title="Accidents by Borough")
     )
 
     # We create the layered chart and return a tuple with the map and the bar chart
@@ -526,7 +526,7 @@ def get_calendar_chart(
                 alt.Tooltip("count()", title="No. accidents"),
             ],
         )
-        .properties(width=int(w), height=int(h / 4))
+        .properties(width=int(w), height=int(h / 4)).resolve_scale(y="independent")
     )
 
     return calendars
@@ -576,13 +576,13 @@ def get_counts_chart(
         total_chart.mark_text(
             align="center",
             baseline="middle",
-            fontSize=15,
+            fontSize=25,
             dx=0,
             fontWeight="bold",
         )
         .encode(
             text=alt.Text("count()"),
-            color=alt.value("black"),
+            color=alt.value("white"),
             x=alt.X().axis(labels=False),
         )
         .properties(width=int(w), height=int(h), title="Total accidents")
@@ -601,13 +601,13 @@ def get_counts_chart(
         .mark_text(
             align="center",
             baseline="middle",
-            fontSize=15,
+            fontSize=25,
             dx=0,
             fontWeight="bold",
         )
         .encode(
             text=alt.Text("count()"),
-            color=alt.value("black"),
+            color=alt.value("white"),
             x=alt.X().axis(labels=False),
         )
         .properties(width=int(w), height=int(h), title="Currently selected")
@@ -642,13 +642,13 @@ def get_counts_chart(
         )
         .encode(
             text=alt.Text("count()"),
-            color=alt.value("black"),
+            color=alt.value("white"),
         )
         .properties(width=int(w), height=int(h * 1.5))
     )
 
     injured_chart = (injured_chart + injured_text).add_params(selection_injured)
-    return (total_chart + total_text) & (total_chart + selected_text) & injured_chart
+    return (total_chart + total_text) | (total_chart + selected_text) | injured_chart
 
 
 def get_month_chart(
@@ -769,7 +769,7 @@ def get_time_of_day_chart(
     h1 = int(2 * h / 3)
     h2 = int(1 * h / 3)
     w1 = int(3 * w / 4)
-    w2 = int(w / 4)
+    w2 = int(w / 8)
 
     custom_sort = [
         "Monday",
@@ -1005,7 +1005,7 @@ def make_visualization(accident_data):
 
     accident_data = accident_data[cols]
 
-    w = 1000
+    w = 800
     geo_view, bur_chart = get_map_chart(
         accident_data,
         selection_buro,
@@ -1018,7 +1018,7 @@ def make_visualization(accident_data):
         selection_injured,
         selection_acc_factor,
         h1=600,
-        h2=350,
+        h2=200,
         w=w,
         ratio=0.7,
     )
@@ -1090,7 +1090,7 @@ def make_visualization(accident_data):
         time_brush,
         selection_injured,
         selection_acc_factor,
-        h=399,
+        h=250,
     )
     acc_factor = get_factor_chart(
         accident_data,
@@ -1121,12 +1121,11 @@ def make_visualization(accident_data):
         h=70,
         w=100,
     )
-    chart = (
-        (geo_view | (bur_chart & vehicles) | counts)
-        & (weather | acc_factor).resolve_scale(color="independent")
-        & (
-            (months | calendar).resolve_scale(color="shared") | time_of_day
+    chart = ( 
+        (geo_view | (counts & ((bur_chart & vehicles) | weather)))
+        & ((months | calendar).resolve_scale(color="shared") | time_of_day
         ).resolve_scale(color="independent")
+        & (weather | acc_factor).resolve_scale(color="independent")
     )
 
     return chart

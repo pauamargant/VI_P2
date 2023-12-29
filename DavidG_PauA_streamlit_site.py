@@ -13,7 +13,7 @@ def get_data():
     return accident_data
 
 
-@st.cache_data
+#@st.cache_data
 def get_graph(data):
     vis = make_visualization(data)
     return vis
