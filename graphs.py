@@ -855,7 +855,7 @@ def get_time_of_day_chart(
         alt.Chart()
         .mark_rect()
         .encode(
-            x=alt.X("HOUR:O", axis=alt.Axis(title="Hour of the day")),
+            x=alt.X("HOUR:O", axis=alt.Axis(title="Hour of the day", labelAngle=0)),
             y=alt.Y("dayname:O", sort=custom_sort, axis=alt.Axis(title=None)),
         )
         .transform_filter(
