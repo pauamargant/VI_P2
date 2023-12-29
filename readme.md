@@ -36,6 +36,8 @@ pip install -r requirements.txt
 ```bash
 conda env create -f environment.yml
 ```
+
+In case incompatibilities appear, the `full_requirements.txt` file contains the full list of libraries and versions used in the project. This file can be used to manually install the required libraries following the previous approach (tested in python 3.11).
 ## Running the Report and the Visualization
 
 ### Report
