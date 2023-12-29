@@ -21,8 +21,6 @@ def get_graph(data):
 
 # make sidebar with instructions
 with st.sidebar:
-    with st.button("Clear graph"):
-        get_graph.clear_cache()
     if st.button("Clear Selection"):
         st.write("Clearing selection")
     with st.expander("How to use"):
@@ -44,7 +42,7 @@ with st.sidebar:
     with st.expander("Troubleshooting"):
         st.write(
             """
-            - If the graph is not showing, try clicking on the 'Reset graph' button.
+            - If the graph is not showing, try clicking on the 'Clear graph' button.
             - **IMPORTANT**: In some cases the interactions may not work as expected. If this happens, please refresh the page and try again.
             For further help, more detailed instructions on how to use it are available by going to the instructions page"""
         )

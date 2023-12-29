@@ -48,6 +48,4 @@ streamlit run DavidG_PauA_streamlit_site.py
 ```
 
 ### Troubleshooting
-In case there are issues related to the installation of the libraries, we recommend trying the alternative installation method. If the issue persists, please contact us.
-
-Furthermore, a prebuilt version of the visualization is also provided in `html` format. This version, which is available in the `char.html` file can be opened in any browser and does not require any additional setup.
+In case there are issues related to the installation of the libraries, we recommend trying the alternative installation method. If the issue persists, a prebuilt version of the visualization is also provided in `html` format. This version, which is available in the `char.html` file can be opened in any browser and does not require any additional setup.
