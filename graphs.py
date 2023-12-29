@@ -2,7 +2,6 @@ import altair as alt
 import pandas as pd
 import geopandas as gpd
 from geodatasets import get_path
-import numpy as np
 
 # we disable max_rows in altair
 alt.data_transformers.disable_max_rows()
