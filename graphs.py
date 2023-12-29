@@ -251,6 +251,7 @@ def get_map_chart(
     h1=400,
     h2=200,
     ratio=0.8,
+    use_interval=True,
 ):
     """
     Creates an interactive map of New York City, showing the number of accidents per burough
@@ -318,8 +319,10 @@ def get_map_chart(
             ),
             tooltip=alt.value(None),
         )
-        .add_params(selection_acc_map)
     )
+
+    if use_interval:
+        points = points.add_selection(selection_acc_map)
 
     # We create the bar chart of the number of accidents per burough
     bar_chart = (
@@ -1029,7 +1032,7 @@ def get_factor_chart(
     )
 
 
-def make_visualization(accident_data):
+def make_visualization(accident_data, use_interval=True):
     """
     It creates the whole visualization, with all the charts and interactivity.
 
@@ -1042,9 +1045,7 @@ def make_visualization(accident_data):
     w = 600
     h = 400
     ratio = 0.2
-
     selection_cond = alt.selection_point(on="click", fields=["conditions"])
-    selection_acc_map = alt.selection_interval(fields=["LATITUDE", "LONGITUDE"])
     selection_buro = alt.selection_point(fields=["name"])
     selection_vehicle = alt.selection_point(on="click", fields=["VEHICLE TYPE CODE 1"])
     time_brush = alt.selection_point(fields=["HOUR"])
@@ -1052,6 +1053,10 @@ def make_visualization(accident_data):
     selection_week = alt.selection_point(fields=["week"])
     selection_weekday = alt.selection_point(fields=["dayname"])
 
+    if use_interval:
+        selection_acc_map = alt.selection_interval(fields=["LATITUDE", "LONGITUDE"])
+    else:
+        selection_acc_map = selection_buro
     month_dropdown = alt.binding_select(
         options=[
             "June, July, August, September",
@@ -1104,6 +1109,7 @@ def make_visualization(accident_data):
         h2=200,
         w=w,
         ratio=0.7,
+        use_interval=use_interval,
     )
     weather = get_weather_chart(
         accident_data,
