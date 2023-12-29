@@ -121,6 +121,49 @@ def get_accident_data(fname, sample=False):
     #df = pd.merge(df, min_week, on="month", how="left")
     #df["week"] = df["week_x"] - df["week_y"] + 1
 
+    replacement_dict = {
+    'Passing Too Closely': 'Traffic Violation - Passing Too Closely',
+    'Driver Inattention/Distraction': 'Driver Distraction',
+    'Unspecified': 'Unclear Reason',
+    'Following Too Closely': 'Tailgating',
+    'Turning Improperly': 'Improper Turning',
+    'Unsafe Lane Changing': 'Unsafe Lane Change',
+    'Pedestrian/Bicyclist/Other Pedestrian Error/Confusion': 'Pedestrian/Bicyclist Error/Confusion',
+    'Driver Inexperience': 'Inexperienced Driver',
+    'Reaction to Uninvolved Vehicle': 'Reaction to Other Vehicle',
+    'Aggressive Driving/Road Rage': 'Aggressive Driving/Road Rage',
+    'Passing or Lane Usage Improper': 'Improper Passing/Lane Usage',
+    'Other Vehicular': 'Other Vehicle Related',
+    'Traffic Control Disregarded': 'Disregarded Traffic Control',
+    'Failure to Yield Right-of-Way': 'Failure to Yield',
+    'Unsafe Speed': 'Excessive Speed',
+    'Fell Asleep': 'Drowsy Driving',
+    'Passenger Distraction': 'Passenger Distraction',
+    'Oversized Vehicle': 'Oversized Vehicle',
+    'Backing Unsafely': 'Unsafe Backing',
+    'Failure to Keep Right': 'Failure to Keep Right',
+    'Outside Car Distraction': 'External Distraction',
+    'Tire Failure/Inadequate': 'Tire Failure/Inadequate',
+    'View Obstructed/Limited': 'Limited Visibility',
+    'Glare': 'Glare Effect',
+    'Alcohol Involvement': 'Alcohol Impairment',
+    'Obstruction/Debris': 'Road Obstruction/Debris',
+    'Pavement Slippery': 'Slippery Pavement',
+    'Brakes Defective': 'Defective Brakes',
+    'Cell Phone (hand-Held)': 'Cell Phone Usage',
+    'Drugs (illegal)': 'Illegal Drug Usage',
+    'Driverless/Runaway Vehicle': 'Runaway Vehicle',
+    'Steering Failure': 'Steering Failure',
+    'Accelerator Defective': 'Defective Accelerator',
+    'Pavement Defective': 'Defective Pavement',
+    'Fatigued/Drowsy': 'Driver Fatigue',
+    'Other Lighting Defects': 'Lighting Defects',
+    'Vehicle Vandalism': 'Malicious Damage'
+}
+
+    df['CONTRIBUTING FACTOR VEHICLE 1'] = df['CONTRIBUTING FACTOR VEHICLE 1'].replace(replacement_dict)
+
+
     df["dayname"] = df["date"].dt.day_name()
     df["monthname"] = df["date"].dt.month_name()
     df["num_days_in_month"] = df["monthname"].apply(
@@ -228,7 +271,7 @@ def get_map_chart(
     # We create the base map
     base = (
         alt.Chart(data_geojson_remote)
-        .mark_geoshape(fill="lightgrey")
+        .mark_geoshape(fill="lightgrey", stroke = "white")
         .properties(
             width=500,
             height=300,
@@ -260,7 +303,10 @@ def get_map_chart(
             longitude="LONGITUDE:Q",
             latitude="LATITUDE:Q",
             size=alt.value(2),
-            color=alt.Color("name:N").scale(
+            color=alt.Color(
+                "name:N",
+                legend=alt.Legend(title="Borough", orient="top-left"),
+            ).scale(
                 # scheme="category20c"
                 range=["#66c2a5", "#fc8d62", "#8da0cb", "#e78ac3", "#a6d854"]
             ),
@@ -289,7 +335,9 @@ def get_map_chart(
             x=alt.X("count()", axis=alt.Axis(title=None)),
             y=alt.Y("name:N", axis=alt.Axis(title="Boroughs")).sort("-x"),
             opacity=alt.condition(selection_buro, alt.value(1), alt.value(0.4)),
-            color=alt.Color("name:N", legend=None),
+            color=alt.Color("name:N", legend=None).scale(
+                range=["#66c2a5", "#fc8d62", "#8da0cb", "#e78ac3", "#a6d854"]
+            ),
             tooltip=[
                 alt.Tooltip("count()", title="No. accidents"),
                 alt.Tooltip("name:N", title="Borough"),
@@ -629,7 +677,8 @@ def get_counts_chart(
             tooltip=[
                 alt.Tooltip("count()", title="No. accidents"),
             ],
-            y=alt.Y("INJURED:N", title=None, axis=alt.Axis(ticks=False)),
+            #color=alt.value("blue"),
+            x=alt.X("INJURED:N", title=None, axis=alt.Axis(ticks=False, labelAngle=0, orient="top")),
         )
     )
     injured_text = (
@@ -644,7 +693,7 @@ def get_counts_chart(
             text=alt.Text("count()"),
             color=alt.value("white"),
         )
-        .properties(width=int(w), height=int(h * 1.5))
+        .properties(width=int(w*1.8), height=int(h * 0.8))
     )
 
     injured_chart = (injured_chart + injured_text).add_params(selection_injured)
@@ -965,7 +1014,7 @@ def make_visualization(accident_data):
     selection_buro = alt.selection_point(fields=["name"])
     selection_vehicle = alt.selection_point(on="click", fields=["VEHICLE TYPE CODE 1"])
     time_brush = alt.selection_point(fields=["HOUR"])
-    selection_injured = alt.selection_multi(fields=["INJURED"])
+    selection_injured = alt.selection_point(fields=["INJURED"])
 
     selection_weekday = alt.selection_point(fields=["dayname"])
 
@@ -1048,7 +1097,7 @@ def make_visualization(accident_data):
         time_brush,
         selection_injured,
         selection_acc_factor,
-        h=399,
+        h=550,
         w=w * 0.3,
     )
     months = get_month_chart(
@@ -1062,7 +1111,7 @@ def make_visualization(accident_data):
         time_brush,
         selection_injured,
         selection_acc_factor,
-        h=399,
+        h=550,
         w=w * 0.3,
     )
     vehicles = get_vehicle_chart(
@@ -1123,9 +1172,8 @@ def make_visualization(accident_data):
     )
     chart = ( 
         (geo_view | (counts & ((bur_chart & vehicles) | weather)))
-        & ((months | calendar).resolve_scale(color="shared") | time_of_day
-        ).resolve_scale(color="independent")
-        & (weather | acc_factor).resolve_scale(color="independent")
+        & ((months | calendar).resolve_scale(color="shared") | ((time_of_day & acc_factor).resolve_scale(color="independent")))
+        
     )
 
     return chart
