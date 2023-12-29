@@ -19,16 +19,9 @@ def get_graph(data):
     return vis
 
 
-accident_data = get_data()
-vis = get_graph(accident_data)
-st.title("NYC Traffic Accidents")
-
-
-st.altair_chart(vis)
-print("done")
-
 # make sidebar with instructions
 with st.sidebar:
+    with st.button("Clear graph"):
         get_graph.clear_cache()
     if st.button("Clear Selection"):
         st.write("Clearing selection")
@@ -55,3 +48,10 @@ with st.sidebar:
             - **IMPORTANT**: In some cases the interactions may not work as expected. If this happens, please refresh the page and try again.
             For further help, more detailed instructions on how to use it are available by going to the instructions page"""
         )
+accident_data = get_data()
+vis = get_graph(accident_data)
+st.title("NYC Traffic Accidents")
+
+
+st.altair_chart(vis)
+print("done")
