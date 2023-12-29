@@ -496,11 +496,11 @@ def get_weather_chart(
         )
         .mark_rect()
         .encode(
-            y=alt.Y("conditions:N", sort=custom_sort, axis=alt.Axis(title=None)),
+            y=alt.Y("conditions:N", sort=custom_sort, axis=alt.Axis(title=None, labelLimit= 2000)),
             color=alt.Color(
                 "count()",
                 legend=alt.Legend(title="No. accidents"),
-                scale=alt.Scale(scheme="blues"),
+                scale=alt.Scale(scheme="purples"),
             ),
             opacity=alt.condition(selection_cond, alt.value(1), alt.value(0.2)),
             tooltip=[
@@ -858,7 +858,7 @@ def get_time_of_day_chart(
         alt.Chart()
         .mark_rect()
         .encode(
-            x=alt.X("HOUR:O", axis=alt.Axis(title="Hour of the day")),
+            x=alt.X("HOUR:O", axis=alt.Axis(title="Hour of the day", labelAngle=0)),
             y=alt.Y("dayname:O", sort=custom_sort, axis=alt.Axis(title=None)),
         )
         .transform_filter(
@@ -913,7 +913,7 @@ def get_time_of_day_chart(
                 scale=alt.Scale(reverse=False),
                 axis=alt.Axis(title="No. accidents"),
             ),
-            x=alt.X("HOUR:O", axis=None),
+            x=alt.X("HOUR:O", axis=alt.Axis(title=None, labelAngle=0, orient="top")),
             opacity=alt.condition(time_brush, alt.value(1), alt.value(0.2)),
             tooltip=[
                 alt.Tooltip("count()", title="No. accidents"),
@@ -1003,14 +1003,13 @@ def get_factor_chart(
         .encode(
             y=alt.Y(
                 "CONTRIBUTING FACTOR VEHICLE 1:N",
-                axis=alt.Axis(title=None, orient="right"),
+                axis=alt.Axis(title=None, orient="right", labelLimit=2000,),
             ).sort("-x"),
             x=alt.X(
                 "counter:Q",
                 axis=alt.Axis(
                     title="No. accidents per Contributing Factor",
-                    orient="bottom",
-                    labelLimit=2000,
+                    orient="bottom"
                 ),
                 scale=alt.Scale(reverse=True),
             ),
@@ -1028,6 +1027,7 @@ def get_factor_chart(
         )
         .transform_filter((alt.datum.rank <= 10))
         .add_params(selection_acc_factor)
+        .properties(width=w, height=h)
         # .properties(title="Top 10 Contributing Factors")
     )
 
@@ -1200,7 +1200,7 @@ def make_visualization(accident_data, use_interval=True):
         selection_acc_factor,
         selection_week,
         h=200,
-        w=2000,
+        w=450,
     )
 
     counts = get_counts_chart(
