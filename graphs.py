@@ -782,9 +782,7 @@ def get_month_chart(
                 axis=alt.Axis(labels=False, ticks=False),
             ),
             color=alt.Color("mean_accidents:Q", scale=alt.Scale(scheme="greens")),
-            opacity=alt.condition(
-                selection_month, alt.value(1), alt.value(0.2)
-            ),
+            opacity=alt.condition(selection_month, alt.value(1), alt.value(0.2)),
             tooltip=[
                 alt.Tooltip("monthname:N", title="Month"),
                 alt.Tooltip("count()", title="No. accidents"),
