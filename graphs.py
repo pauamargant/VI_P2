@@ -313,6 +313,7 @@ def get_map_chart(
             opacity=alt.condition(
                 selection_buro & selection_acc_map, alt.value(1), alt.value(0)
             ),
+            tooltip=alt.value(None),
         )
         .add_params(selection_acc_map)
     )
@@ -562,7 +563,7 @@ def get_calendar_chart(
             color=alt.Color(
                 "count()",
                 scale=alt.Scale(scheme="greens"),
-                legend=alt.Legend(title="No. accidents"),
+                legend=alt.Legend(title="No. accidents", orient="top"),
             ),
             opacity=alt.condition(
                 selection_weekday,
@@ -638,6 +639,7 @@ def get_counts_chart(
     selected_text = (
         total_chart.transform_filter(
             selection_acc_map
+            & selection_buro
             & selection_cond
             & selection_month
             & selection_weekday
@@ -665,6 +667,7 @@ def get_counts_chart(
         .mark_bar(cornerRadius=10)
         .transform_filter(
             selection_acc_map
+            & selection_buro
             & selection_cond
             & selection_month
             & selection_weekday
@@ -760,7 +763,7 @@ def get_month_chart(
                 axis=alt.Axis(labels=False, ticks=False),
             ),
             color=alt.Color(
-                "mean_accidents:Q", legend=None, scale=alt.Scale(scheme="greens")
+                "mean_accidents:Q", scale=alt.Scale(scheme="greens")
             ),
             opacity=alt.condition(selection_month, alt.value(1), alt.value(0.2)),
             tooltip=[
@@ -974,9 +977,9 @@ def get_factor_chart(
         .encode(
             y=alt.Y(
                 "CONTRIBUTING FACTOR VEHICLE 1:N",
-                axis=alt.Axis(title=None),
+                axis=alt.Axis(title=None, orient="right"),
             ).sort("-x"),
-            x=alt.X("counter:Q", axis=alt.Axis(title="No. accidents")),
+            x=alt.X("counter:Q", axis=alt.Axis(title="No. accidents per Contributing Factor", orient="bottom", labelLimit=2000), scale=alt.Scale(reverse=True)),
             opacity=alt.condition(selection_acc_factor, alt.value(1), alt.value(0.2)),
             tooltip=[
                 alt.Tooltip("counter:Q", title="No. accidents"),
@@ -991,7 +994,7 @@ def get_factor_chart(
         )
         .transform_filter((alt.datum.rank <= 10))
         .add_params(selection_acc_factor)
-        .properties(title="Top 10 Contributing Factors")
+        #.properties(title="Top 10 Contributing Factors")
     )
 
 
@@ -1053,7 +1056,6 @@ def make_visualization(accident_data):
     ]
 
     accident_data = accident_data[cols]
-
     w = 800
     geo_view, bur_chart = get_map_chart(
         accident_data,
@@ -1140,6 +1142,7 @@ def make_visualization(accident_data):
         selection_injured,
         selection_acc_factor,
         h=250,
+        w = 600,
     )
     acc_factor = get_factor_chart(
         accident_data,
@@ -1152,8 +1155,8 @@ def make_visualization(accident_data):
         time_brush,
         selection_injured,
         selection_acc_factor,
-        h=399,
-        w=w * 0.3,
+        h = 200,
+        w = 2000,
     )
 
     counts = get_counts_chart(
@@ -1172,8 +1175,7 @@ def make_visualization(accident_data):
     )
     chart = ( 
         (geo_view | (counts & ((bur_chart & vehicles) | weather)))
-        & ((months | calendar).resolve_scale(color="shared") | ((time_of_day & acc_factor).resolve_scale(color="independent")))
-        
+        & ((months | calendar).resolve_scale(color="shared") | ((time_of_day & acc_factor).resolve_scale(color="independent")))    
     )
 
     return chart
