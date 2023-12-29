@@ -11,7 +11,9 @@ With this objective in mind the Python Altair and Streamlit libraries have been 
 
 Included in this repository are both datasets, which have previously been preprocessed using OpenRefine.
 
-An online version of the visualization is currently deployed at [Streamlit](https://davidg-paua-streamlit.herokuapp.com/).
+An **online version** of the visualization is currently deployed and can be accessed at [Streamlit](https://davidg-paua-streamlit.herokuapp.com/).
+
+![Visualization](https://raw.githubusercontent.com/pauamargant/VI_P1/main/resources/ex1_solution.gif)
 
 
 ## Requirements
@@ -23,7 +25,7 @@ In order to ensure the code run properly we recommend using a dedicated*conda* e
 - geopandas
 - geodatasets
 ### Setting up the environment
-In order to set up the required environment we recommend creating a new environment using the following instructions. You can try to run the code by manually installing the latest version of the aforementioned librries.
+In order to set up the required environment we recommend creating a new environment using the following instructions. You can try to run the code by manually installing the latest version of the aforementioned libraries in an existing environment but version incompatibilities might appear. 
 Otherwise, We provide two different ways to create the environment, using the provided *environment.yml* file or manually installing the required libraries. 
 
 - Creating the conda environment manually and installing the required libraries (_faster_). Note that `<env_name>` must be replaced with the desired name for the environment.
@@ -45,9 +47,8 @@ In order to view the report, we provide a *Jupyter Notebook* which contains the 
 
 In order to ran the notebook the following files must be placed in the same location as the notebook:
 - `dataset_v1.csv`
-- `weather.csv`
+- `weather2018.csv`
 - `graphs.py`
-- `requirements.txt`
 Please note that the visualizations are preloaded in the notebook but if not ran in Google Colab, the visualizations might not be displayed. In order to view the visualizations, please run the code.
 
 ### Visualization
