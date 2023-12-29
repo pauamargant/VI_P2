@@ -496,7 +496,11 @@ def get_weather_chart(
         )
         .mark_rect()
         .encode(
-            y=alt.Y("conditions:N", sort=custom_sort, axis=alt.Axis(title=None, labelLimit= 2000)),
+            y=alt.Y(
+                "conditions:N",
+                sort=custom_sort,
+                axis=alt.Axis(title=None, labelLimit=2000),
+            ),
             color=alt.Color(
                 "count()",
                 legend=alt.Legend(title="No. accidents"),
@@ -1003,13 +1007,16 @@ def get_factor_chart(
         .encode(
             y=alt.Y(
                 "CONTRIBUTING FACTOR VEHICLE 1:N",
-                axis=alt.Axis(title=None, orient="right", labelLimit=2000,),
+                axis=alt.Axis(
+                    title=None,
+                    orient="right",
+                    labelLimit=2000,
+                ),
             ).sort("-x"),
             x=alt.X(
                 "counter:Q",
                 axis=alt.Axis(
-                    title="No. accidents per Contributing Factor",
-                    orient="bottom"
+                    title="No. accidents per Contributing Factor", orient="bottom"
                 ),
                 scale=alt.Scale(reverse=True),
             ),

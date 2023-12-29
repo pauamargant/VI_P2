@@ -41,6 +41,11 @@ conda env create -f environment.yml
 ### Report
 In order to view the report, we provide a *Jupyter Notebook* which contains the design process and the answers to the questions. The notebook can be opened using Google Colab or Jupyter Notebook. In order to run the notebook, the required libraries must be installed, a cell with the required commands is provided in the notebook.
 
+In order to ran the notebook the following files must be placed in the same location as the notebook:
+- `dataset_v1.csv`
+- `weather.csv`
+- `graphs.py`
+- `requirements.txt`
 Please note that the visualizations are preloaded in the notebook but if not ran in Google Colab, the visualizations might not be displayed. In order to view the visualizations, please run the code.
 
 ### Visualization
