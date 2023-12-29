@@ -234,6 +234,15 @@ def get_weather_data(
     return data
 
 
+def get_clean_data(
+    raw_data = "dataset_v1.csv",
+    weather_data = "weather2018.csv",
+):
+    data = get_accident_data(fname="dataset_v1.csv", sample=False)
+    accident_data = get_weather_data(data, fname="weather2018.csv")
+    accident_data.to_csv("clean_data.csv")
+    return accident_data
+
 def get_map_chart(
     accident_data,
     selection_buro,

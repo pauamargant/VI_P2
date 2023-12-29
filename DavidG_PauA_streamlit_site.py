@@ -7,9 +7,8 @@ st.set_page_config(layout="centered", page_title="NYC Traffic Accidents")
 
 @st.cache_data
 def get_data():
-    data = get_accident_data(fname="dataset_v1.csv", sample=False)
-    accident_data = get_weather_data(data, fname="weather2018.csv")
-
+    accident_data = get_clean_data(raw_data="dataset_v1.csv", weather_data="weather2018.csv")
+ 
     return accident_data
 
 
