@@ -11,7 +11,7 @@ With this objective in mind the Python Altair and Streamlit libraries have been 
 
 Included in this repository are both datasets, which have previously been preprocessed using OpenRefine.
 
-AQUI UNA FOTO DE LA VIS.
+An online version of the visualization is currently deployed at [Streamlit](https://davidg-paua-streamlit.herokuapp.com/).
 
 
 ## Requirements
@@ -59,4 +59,5 @@ In case issues arise, you can run the premade html visualization by opening the 
 
 ### Troubleshooting
 In case there are issues related to the installation of the libraries, we recommend trying the alternative installation method. If the issue persists, a prebuilt version of the visualization is also provided in `html` format. This version, which is available in the `chart.html` file can be opened in any browser and does not require any additional setup.
+
 
