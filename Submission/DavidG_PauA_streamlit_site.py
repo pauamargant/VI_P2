@@ -8,17 +8,15 @@ st.set_page_config(layout="centered", page_title="NYC Traffic Accidents")
 @st.cache_data
 def get_data():
     accident_data = pd.read_csv("clean_data.csv")
- 
+
     return accident_data
 
 
-# @st.cache_data
 def get_graph(data):
     vis = make_visualization(data)
     return vis
 
 
-# make sidebar with instructions
 with st.sidebar:
     st.write(
         """This app allows you to explore the relationship between weather and traffic accidents in NYC.
